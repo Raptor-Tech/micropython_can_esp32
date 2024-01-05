@@ -34,7 +34,7 @@
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-
+#include "driver/twai.h"
 #include "driver/spi_master.h"
 
 #define MICROPY_PLATFORM_VERSION "IDF" IDF_VER
