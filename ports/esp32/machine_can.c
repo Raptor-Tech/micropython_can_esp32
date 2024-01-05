@@ -55,6 +55,7 @@
 #define CAN_DEFAULT_BS1 (15)
 #define CAN_DEFAULT_BS2 (4)
 #define CAN_MAX_DATA_FRAME          (8)
+//esp_log_level_set("*", ESP_LOG_INFO);
 
 /*
 // Internal Functions
@@ -214,9 +215,12 @@ STATIC mp_obj_t esp32_hw_can_init_helper(esp32_can_obj_t *self, size_t n_args, c
     self->config->general.clkout_divider = 0;
     self->loopback = ((args[ARG_mode].u_int & CAN_MODE_SILENT_LOOPBACK) > 0);
     self->extframe = args[ARG_extframe].u_bool;
-    //if (args[ARG_auto_restart].u_bool) {
-    //    mp_raise_NotImplementedError("Auto-restart not supported");
-    //}
+    
+    // Force auto_restart to always be false
+    args[ARG_auto_restart].u_bool = false;
+    if (args[ARG_auto_restart].u_bool) {
+        mp_raise_NotImplementedError("Auto-restart not supported");
+    }
     self->config->filter = f_config; // TWAI_FILTER_CONFIG_ACCEPT_ALL();
 
     // clear errors
@@ -225,16 +229,11 @@ STATIC mp_obj_t esp32_hw_can_init_helper(esp32_can_obj_t *self, size_t n_args, c
     self->num_bus_off = 0;
 
     // Calculate CAN nominal bit timing from baudrate if provided
-    twai_timing_config_t *timing;
+    twai_timing_config_t timing;
+    /*
     switch ((int)args[ARG_baudrate].u_int) {
     case 0:
-        timing = &((twai_timing_config_t) {
-            .brp = args[ARG_prescaler].u_int,
-            .sjw = args[ARG_sjw].u_int,
-            .tseg_1 = args[ARG_bs1].u_int,
-            .tseg_2 = args[ARG_bs2].u_int,
-            .triple_sampling = false
-        });
+        timing = &((twai_timing_config_t)TWAI_TIMING_CONFIG_250KBITS());
         break;
         #ifdef TWAI_TIMING_CONFIG_1KBITS
         case 1000:
@@ -291,12 +290,21 @@ STATIC mp_obj_t esp32_hw_can_init_helper(esp32_can_obj_t *self, size_t n_args, c
         timing = &((twai_timing_config_t)TWAI_TIMING_CONFIG_1MBITS());
         break;
     default:
-        mp_raise_ValueError("Unable to set baudrate");
-        self->config->baudrate = 0;
-        return mp_const_none;
+        timing = &((twai_timing_config_t)TWAI_TIMING_CONFIG_250KBITS());
+        break;
+	//mp_raise_ValueError("Unable to set baudrate");
+        //self->config->baudrate = 0;
+        //return mp_const_none;
     }
-    self->config->timing = *timing;
+    */
+//    self->config->timing =*TWAI_TIMING_CONFIG_250KBITS();
+   //ESP_LOGI("CAN_INIT", "Initializing with baudrate: %u", args[ARG_baudrate].u_int);
 
+
+    timing = ((twai_timing_config_t)TWAI_TIMING_CONFIG_250KBITS());
+    self->config->baudrate = 250000;
+    self->config->timing = timing;
+    //twai_driver_install(&self->config->general, &self->config->timing, &self->config->filter);
     check_esp_err(twai_driver_install(&self->config->general, &self->config->timing, &self->config->filter));
     check_esp_err(twai_start());
     if (xTaskCreatePinnedToCore(esp32_hw_can_irq_task, "can_irq_task", CAN_TASK_STACK_SIZE, self, CAN_TASK_PRIORITY, (TaskHandle_t *)&self->irq_handler, MP_TASK_COREID) != pdPASS) {
