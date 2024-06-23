@@ -47,9 +47,9 @@
 #include "modespnow.h"
 #endif
 
-STATIC char heap[38 * 1024];
+static char heap[38 * 1024];
 
-STATIC void mp_reset(void) {
+static void mp_reset(void) {
     mp_stack_set_top((void *)0x40000000);
     mp_stack_set_limit(8192);
     mp_hal_init();
@@ -63,7 +63,6 @@ STATIC void mp_reset(void) {
     #endif
     pin_init0();
     readline_init0();
-    dupterm_task_init();
 
     // Activate UART(0) on dupterm slot 1 for the REPL
     {

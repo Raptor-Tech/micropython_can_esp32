@@ -65,6 +65,7 @@ OPENOCD_CONFIG ?= boards/openocd_stm32f4.cfg
 include stm32.mk
 
 PLLVALUES = boards/pllvalues.py
+PLLI2SVALUES = boards/plli2svalues.py
 MAKE_PINS = boards/make-pins.py
 BOARD_PINS = $(BOARD_DIR)/pins.csv
 PREFIX_FILE = boards/stm32f4xx_prefix.c
@@ -82,6 +83,7 @@ GEN_CDCINF_FILE = $(HEADER_BUILD)/pybcdc.inf
 GEN_CDCINF_HEADER = $(HEADER_BUILD)/pybcdc_inf.h
 
 GEN_PLLFREQTABLE_HDR = $(HEADER_BUILD)/pllfreqtable.h
+GEN_PLLI2STABLE_HDR = $(HEADER_BUILD)/plli2stable.h
 GEN_STMCONST_HDR = $(HEADER_BUILD)/modstm_const.h
 GEN_STMCONST_MPZ = $(HEADER_BUILD)/modstm_mpz.h
 CMSIS_MCU_HDR = $(STM32LIB_CMSIS_ABS)/Include/$(CMSIS_MCU_LOWER).h
@@ -187,96 +189,19 @@ SHARED_SRC_C += $(addprefix shared/,\
 	)
 
 ifeq ($(MICROPY_FLOAT_IMPL),double)
-LIBM_SRC_C += $(addprefix lib/libm_dbl/,\
-	__cos.c \
-	__expo2.c \
-	__fpclassify.c \
-	__rem_pio2.c \
-	__rem_pio2_large.c \
-	__signbit.c \
-	__sin.c \
-	__tan.c \
-	acos.c \
-	acosh.c \
-	asin.c \
-	asinh.c \
-	atan.c \
-	atan2.c \
-	atanh.c \
-	ceil.c \
-	cos.c \
-	cosh.c \
-	copysign.c \
-	erf.c \
-	exp.c \
-	expm1.c \
-	floor.c \
-	fmod.c \
-	frexp.c \
-	ldexp.c \
-	lgamma.c \
-	log.c \
-	log10.c \
-	log1p.c \
-	modf.c \
-	nearbyint.c \
-	pow.c \
-	rint.c \
-	round.c \
-	scalbn.c \
-	sin.c \
-	sinh.c \
-	tan.c \
-	tanh.c \
-	tgamma.c \
-	trunc.c \
-	)
+LIBM_SRC_C += $(SRC_LIB_LIBM_DBL_C)
 ifeq ($(SUPPORTS_HARDWARE_FP_DOUBLE),1)
-LIBM_SRC_C += lib/libm_dbl/thumb_vfp_sqrt.c
+LIBM_SRC_C += $(SRC_LIB_LIBM_DBL_SQRT_HW_C)
 else
-LIBM_SRC_C += lib/libm_dbl/sqrt.c
+LIBM_SRC_C += $(SRC_LIB_LIBM_DBL_SQRT_SW_C)
 endif
 else
-LIBM_SRC_C += $(addprefix lib/libm/,\
-	math.c \
-	acoshf.c \
-	asinfacosf.c \
-	asinhf.c \
-	atan2f.c \
-	atanf.c \
-	atanhf.c \
-	ef_rem_pio2.c \
-	erf_lgamma.c \
-	fmodf.c \
-	kf_cos.c \
-	kf_rem_pio2.c \
-	kf_sin.c \
-	kf_tan.c \
-	log1pf.c \
-	nearbyintf.c \
-	roundf.c \
-	sf_cos.c \
-	sf_erf.c \
-	sf_frexp.c \
-	sf_ldexp.c \
-	sf_modf.c \
-	sf_sin.c \
-	sf_tan.c \
-	wf_lgamma.c \
-	wf_tgamma.c \
-	)
+LIBM_SRC_C += $(SRC_LIB_LIBM_C)
 ifeq ($(SUPPORTS_HARDWARE_FP_SINGLE),1)
-LIBM_SRC_C += lib/libm/thumb_vfp_sqrtf.c
+LIBM_SRC_C += $(SRC_LIB_LIBM_SQRT_HW_C)
 else
-LIBM_SRC_C += lib/libm/ef_sqrt.c
+LIBM_SRC_C += $(SRC_LIB_LIBM_SQRT_SW_C)
 endif
-endif
-
-LIBM_O = $(addprefix $(BUILD)/, $(LIBM_SRC_C:.c=.o))
-
-# Too many warnings in libm_dbl, disable for now.
-ifeq ($(MICROPY_FLOAT_IMPL),double)
-$(LIBM_O): CFLAGS := $(filter-out -Wdouble-promotion -Wfloat-conversion, $(CFLAGS))
 endif
 
 DRIVERS_SRC_C += $(addprefix drivers/,\
@@ -326,6 +251,7 @@ SRC_C += \
 	pyb_can.c \
 	usb.c \
 	eth.c \
+	eth_phy.c \
 	gccollect.c \
 	help.c \
 	machine_bitstream.c \
@@ -357,7 +283,7 @@ SRC_C += \
 SRC_O += \
 	$(STARTUP_FILE) \
 	$(SYSTEM_FILE)
-    
+
 ifeq ($(MCU_SERIES),$(filter $(MCU_SERIES),f0 g0 l0))
 CSUPEROPT = -Os # save some code space
 SRC_O += \
@@ -413,6 +339,10 @@ HAL_SRC_C += $(addprefix $(STM32LIB_HAL_BASE)/Src/stm32$(MCU_SERIES)xx_,\
 	ll_sdmmc.c \
 	ll_fmc.c \
 	)
+ifeq ($(MCU_SERIES),$(filter $(MCU_SERIES),h5))
+# HAL H5-1.0.0 has a bug with uninitialised variable in HAL_SD_ConfigWideBusOperation.
+$(BUILD)/$(STM32LIB_HAL_BASE)/Src/stm32$(MCU_SERIES)xx_hal_sd.o: CFLAGS += -Wno-error=maybe-uninitialized
+endif
 endif
 
 ifeq ($(MCU_SERIES),$(filter $(MCU_SERIES),f4 f7 h7))
@@ -492,12 +422,23 @@ endif
 
 endif # MICROPY_PY_BLUETOOTH
 
+# Add stm32-specific implementation of libmetal (and optionally OpenAMP's rproc).
+# Note: libmetal code is generated via a pre-processor so ensure that runs first.
+ifeq ($(MICROPY_PY_OPENAMP),1)
+SRC_C += mpmetalport.c
+$(BUILD)/mpmetalport.o: $(BUILD)/openamp/metal/config.h
+ifeq ($(MICROPY_PY_OPENAMP_REMOTEPROC),1)
+SRC_C += mpremoteprocport.c
+$(BUILD)/mpremoteprocport.o: $(BUILD)/openamp/metal/config.h
+endif
+endif
+
 # SRC_O should be placed first to work around this LTO bug with binutils <2.35:
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=83967
 OBJ += $(addprefix $(BUILD)/, $(SRC_O))
 OBJ += $(PY_O)
 OBJ += $(addprefix $(BUILD)/, $(LIB_SRC_C:.c=.o))
-OBJ += $(LIBM_O)
+OBJ += $(addprefix $(BUILD)/, $(LIBM_SRC_C:.c=.o))
 OBJ += $(addprefix $(BUILD)/, $(SHARED_SRC_C:.c=.o))
 OBJ += $(addprefix $(BUILD)/, $(DRIVERS_SRC_C:.c=.o))
 OBJ += $(addprefix $(BUILD)/, $(HAL_SRC_C:.c=.o))
@@ -680,6 +621,11 @@ powerctrl.c: $(GEN_PLLFREQTABLE_HDR)
 $(GEN_PLLFREQTABLE_HDR): $(PLLVALUES) | $(HEADER_BUILD)
 	$(ECHO) "GEN $@"
 	$(Q)$(PYTHON) $(PLLVALUES) -c -m $(CMSIS_MCU_LOWER) file:$(BOARD_DIR)/stm32$(MCU_SERIES)xx_hal_conf.h > $@
+
+$(TOP)/extmod/machine_i2s.c: $(GEN_PLLI2STABLE_HDR)
+$(GEN_PLLI2STABLE_HDR): $(PLLI2SVALUES) | $(HEADER_BUILD)
+	$(ECHO) "GEN $@"
+	$(Q)$(PYTHON) $(PLLI2SVALUES) -c -m $(CMSIS_MCU_LOWER) hse:$(BOARD_DIR)/stm32$(MCU_SERIES)xx_hal_conf.h pllm:$(BOARD_DIR)/mpconfigboard.h > $@
 
 $(BUILD)/modstm.o: $(GEN_STMCONST_HDR)
 $(HEADER_BUILD)/modstm_const.h: $(CMSIS_MCU_HDR) make-stmconst.py | $(HEADER_BUILD)

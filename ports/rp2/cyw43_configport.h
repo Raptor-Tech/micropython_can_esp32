@@ -30,6 +30,7 @@
 #include "py/mpconfig.h"
 #include "py/mperrno.h"
 #include "py/mphal.h"
+#include "py/runtime.h"
 #include "extmod/modnetwork.h"
 #include "pendsv.h"
 
@@ -116,9 +117,14 @@ static inline void cyw43_delay_us(uint32_t us) {
 }
 
 static inline void cyw43_delay_ms(uint32_t ms) {
-    mp_hal_delay_ms(ms);
+    // PendSV may be disabled via CYW43_THREAD_ENTER, so this delay is a busy loop.
+    uint32_t us = ms * 1000;
+    uint32_t start = mp_hal_ticks_us();
+    while (mp_hal_ticks_us() - start < us) {
+        mp_event_handle_nowait();
+    }
 }
 
-#define CYW43_EVENT_POLL_HOOK MICROPY_EVENT_POLL_HOOK_FAST
+#define CYW43_EVENT_POLL_HOOK mp_event_handle_nowait()
 
 #endif // MICROPY_INCLUDED_RP2_CYW43_CONFIGPORT_H

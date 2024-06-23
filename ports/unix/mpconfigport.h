@@ -221,16 +221,6 @@ static inline unsigned long mp_random_seed_init(void) {
 #include <stdio.h>
 #endif
 
-// In lieu of a WFI(), slow down polling from being a tight loop.
-#ifndef MICROPY_EVENT_POLL_HOOK
-#define MICROPY_EVENT_POLL_HOOK \
-    do { \
-        extern void mp_handle_pending(bool); \
-        mp_handle_pending(true); \
-        usleep(500); /* equivalent to mp_hal_delay_us(500) */ \
-    } while (0);
-#endif
-
 // Configure the implementation of machine.idle().
 #include <sched.h>
 #define MICROPY_UNIX_MACHINE_IDLE sched_yield();

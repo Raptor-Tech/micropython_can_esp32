@@ -52,6 +52,10 @@
 #ifndef MICROPY_HW_USB_MSC
 #define MICROPY_HW_USB_MSC (0)
 #endif
+
+#ifndef MICROPY_HW_ENABLE_USB_RUNTIME_DEVICE
+#define MICROPY_HW_ENABLE_USB_RUNTIME_DEVICE    (1) // Support machine.USBDevice
+#endif
 #endif
 
 #ifndef MICROPY_CONFIG_ROM_LEVEL
@@ -89,15 +93,18 @@
 // Fine control over Python builtins, classes, modules, etc
 #define MICROPY_PY_BUILTINS_HELP_TEXT           rp2_help_text
 #define MICROPY_PY_SYS_PLATFORM                 "rp2"
+#ifndef MICROPY_PY_THREAD
 #define MICROPY_PY_THREAD                       (1)
 #define MICROPY_PY_THREAD_GIL                   (0)
 #define MICROPY_THREAD_YIELD()                  mp_handle_pending(true)
+#endif
 
 // Extended modules
 #define MICROPY_EPOCH_IS_1970                   (1)
 #define MICROPY_PY_OS_INCLUDEFILE               "ports/rp2/modos.c"
 #ifndef MICROPY_PY_OS_DUPTERM
 #define MICROPY_PY_OS_DUPTERM                   (1)
+#define MICROPY_PY_OS_DUPTERM_NOTIFY            (1)
 #endif
 #define MICROPY_PY_OS_SYNC                      (1)
 #define MICROPY_PY_OS_UNAME                     (1)
@@ -112,6 +119,7 @@
 #define MICROPY_PY_RANDOM_SEED_INIT_FUNC        (rosc_random_u32())
 #define MICROPY_PY_MACHINE                      (1)
 #define MICROPY_PY_MACHINE_INCLUDEFILE          "ports/rp2/modmachine.c"
+#define MICROPY_PY_MACHINE_RESET                (1)
 #define MICROPY_PY_MACHINE_BARE_METAL_FUNCS     (1)
 #define MICROPY_PY_MACHINE_BOOTLOADER           (1)
 #define MICROPY_PY_MACHINE_DISABLE_IRQ_ENABLE_IRQ (1)
@@ -145,6 +153,10 @@
 #define MICROPY_VFS_FAT                         (1)
 #define MICROPY_SSL_MBEDTLS                     (1)
 #define MICROPY_PY_LWIP_SOCK_RAW                (MICROPY_PY_LWIP)
+
+// Hardware timer alarm index. Available range 0-3.
+// Number 3 is currently used by pico-sdk (PICO_TIME_DEFAULT_ALARM_POOL_HARDWARE_ALARM_NUM)
+#define MICROPY_HW_SOFT_TIMER_ALARM_NUM         (2)
 
 // fatfs configuration
 #define MICROPY_FATFS_ENABLE_LFN                (1)
@@ -243,23 +255,6 @@ extern const struct _mp_obj_type_t mod_network_nic_type_wiznet5k;
 #ifndef MICROPY_HW_BOOTSEL_DELAY_US
 #define MICROPY_HW_BOOTSEL_DELAY_US 8
 #endif
-
-// Prevent the "lwIP task" from running when unsafe to do so.
-#define MICROPY_PY_LWIP_ENTER   lwip_lock_acquire();
-#define MICROPY_PY_LWIP_REENTER lwip_lock_acquire();
-#define MICROPY_PY_LWIP_EXIT    lwip_lock_release();
-
-#define MICROPY_EVENT_POLL_HOOK_FAST \
-    do { \
-        extern void mp_handle_pending(bool); \
-        mp_handle_pending(true); \
-    } while (0)
-
-#define MICROPY_EVENT_POLL_HOOK \
-    do { \
-        MICROPY_EVENT_POLL_HOOK_FAST; \
-        __wfe(); \
-    } while (0);
 
 #define MICROPY_MAKE_POINTER_CALLABLE(p) ((void *)((mp_uint_t)(p) | 1))
 

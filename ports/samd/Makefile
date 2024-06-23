@@ -68,7 +68,8 @@ CFLAGS += $(INC) -Wall -Werror -std=c99 -nostdlib -mthumb $(CFLAGS_MCU) -fsingle
 CFLAGS += -DMCU_$(MCU_SERIES) -D__$(CMSIS_MCU)__
 CFLAGS += $(CFLAGS_EXTRA)
 
-CFLAGS += -DMICROPY_HW_CODESIZE=$(MICROPY_HW_CODESIZE)
+# Strip the letter 'K' from MICROPY_HW_CODESIZE for use by C code.
+CFLAGS += -DMICROPY_HW_CODESIZE=$(strip $(subst K,' ', $(MICROPY_HW_CODESIZE)))
 
 LDFLAGS += -nostdlib $(addprefix -T,$(LD_FILES)) -Map=$@.map --cref
 LDFLAGS += --defsym=_codesize=$(MICROPY_HW_CODESIZE)
@@ -132,9 +133,10 @@ SHARED_SRC_C += \
 	shared/runtime/stdout_helpers.c \
 	shared/runtime/sys_stdio_mphal.c \
 	shared/timeutils/timeutils.c \
-	shared/tinyusb/mp_cdc_common.c \
 	shared/tinyusb/mp_usbd.c \
+	shared/tinyusb/mp_usbd_cdc.c \
 	shared/tinyusb/mp_usbd_descriptor.c \
+	shared/tinyusb/mp_usbd_runtime.c \
 
 ASF4_SRC_C += $(addprefix lib/asf4/$(MCU_SERIES_LOWER)/,\
 	hal/src/hal_atomic.c \
@@ -142,35 +144,8 @@ ASF4_SRC_C += $(addprefix lib/asf4/$(MCU_SERIES_LOWER)/,\
 	hpl/nvmctrl/hpl_nvmctrl.c \
 	)
 
-LIBM_SRC_C += $(addprefix lib/libm/,\
-	acoshf.c \
-	asinfacosf.c \
-	asinhf.c \
-	atan2f.c \
-	atanf.c \
-	atanhf.c \
-	ef_rem_pio2.c \
-	ef_sqrt.c \
-	erf_lgamma.c \
-	fmodf.c \
-	kf_cos.c \
-	kf_rem_pio2.c \
-	kf_sin.c \
-	kf_tan.c \
-	log1pf.c \
-	math.c \
-	nearbyintf.c \
-	roundf.c \
-	sf_cos.c \
-	sf_erf.c \
-	sf_frexp.c \
-	sf_ldexp.c \
-	sf_modf.c \
-	sf_sin.c \
-	sf_tan.c \
-	wf_lgamma.c \
-	wf_tgamma.c \
-	)
+LIBM_SRC_C += $(SRC_LIB_LIBM_C)
+LIBM_SRC_C += $(SRC_LIB_LIBM_SQRT_SW_C)
 
 TINYUSB_SRC_C += $(addprefix lib/tinyusb/src/,\
 	class/cdc/cdc_device.c \

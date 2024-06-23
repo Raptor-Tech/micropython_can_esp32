@@ -6,12 +6,20 @@ else
     MAKEOPTS="-j$(sysctl -n hw.ncpu)"
 fi
 
+# Ensure known OPEN_MAX (NO_FILES) limit.
+ulimit -n 1024
+
 ########################################################################################
 # general helper functions
 
 function ci_gcc_arm_setup {
     sudo apt-get install gcc-arm-none-eabi libnewlib-arm-none-eabi
     arm-none-eabi-gcc --version
+}
+
+function ci_gcc_riscv_setup {
+    sudo apt-get install gcc-riscv64-unknown-elf picolibc-riscv64-unknown-elf
+    riscv64-unknown-elf-gcc --version
 }
 
 ########################################################################################
@@ -25,17 +33,6 @@ function ci_c_code_formatting_setup {
 function ci_c_code_formatting_run {
     # Only run on C files. The ruff rule runs separately on Python.
     tools/codeformat.py -v -c
-}
-
-########################################################################################
-# code spelling
-
-function ci_code_spell_setup {
-    pip3 install codespell tomli
-}
-
-function ci_code_spell_run {
-    codespell
 }
 
 ########################################################################################
@@ -63,7 +60,7 @@ function ci_code_size_setup {
 function ci_code_size_build {
     # check the following ports for the change in their code size
     PORTS_TO_CHECK=bmusxpd
-    SUBMODULES="lib/asf4 lib/berkeley-db-1.xx lib/mbedtls lib/micropython-lib lib/nxp_driver lib/pico-sdk lib/stm32lib lib/tinyusb"
+    SUBMODULES="lib/asf4 lib/berkeley-db-1.xx lib/btstack lib/cyw43-driver lib/lwip lib/mbedtls lib/micropython-lib lib/nxp_driver lib/pico-sdk lib/stm32lib lib/tinyusb"
 
     # starts off at either the ref/pull/N/merge FETCH_HEAD, or the current branch HEAD
     git checkout -b pull_request # save the current location
@@ -118,26 +115,45 @@ function ci_cc3200_build {
 ########################################################################################
 # ports/esp32
 
-function ci_esp32_idf50_setup {
+# GitHub tag of ESP-IDF to use for CI (note: must be a tag or a branch)
+IDF_VER=v5.0.4
+
+export IDF_CCACHE_ENABLE=1
+
+function ci_esp32_idf_setup {
     pip3 install pyelftools
-    git clone https://github.com/espressif/esp-idf.git
-    git -C esp-idf checkout v5.0.2
+    git clone --depth 1 --branch $IDF_VER https://github.com/espressif/esp-idf.git
+    # doing a treeless clone isn't quite as good as --shallow-submodules, but it
+    # is smaller than full clones and works when the submodule commit isn't a head.
+    git -C esp-idf submodule update --init --recursive --filter=tree:0
     ./esp-idf/install.sh
 }
 
-function ci_esp32_build {
+function ci_esp32_build_common {
     source esp-idf/export.sh
     make ${MAKEOPTS} -C mpy-cross
     make ${MAKEOPTS} -C ports/esp32 submodules
+}
+
+function ci_esp32_build_cmod_spiram_s2 {
+    ci_esp32_build_common
+
     make ${MAKEOPTS} -C ports/esp32 \
         USER_C_MODULES=../../../examples/usercmodule/micropython.cmake \
         FROZEN_MANIFEST=$(pwd)/ports/esp32/boards/manifest_test.py
-    make ${MAKEOPTS} -C ports/esp32 BOARD=ESP32_GENERIC_C3
-    make ${MAKEOPTS} -C ports/esp32 BOARD=ESP32_GENERIC_S2
-    make ${MAKEOPTS} -C ports/esp32 BOARD=ESP32_GENERIC_S3
 
     # Test building native .mpy with xtensawin architecture.
     ci_native_mpy_modules_build xtensawin
+
+    make ${MAKEOPTS} -C ports/esp32 BOARD=ESP32_GENERIC BOARD_VARIANT=SPIRAM
+    make ${MAKEOPTS} -C ports/esp32 BOARD=ESP32_GENERIC_S2
+}
+
+function ci_esp32_build_s3_c3 {
+    ci_esp32_build_common
+
+    make ${MAKEOPTS} -C ports/esp32 BOARD=ESP32_GENERIC_S3
+    make ${MAKEOPTS} -C ports/esp32 BOARD=ESP32_GENERIC_C3
 }
 
 ########################################################################################
@@ -167,18 +183,19 @@ function ci_esp8266_build {
 # ports/webassembly
 
 function ci_webassembly_setup {
+    npm install terser
     git clone https://github.com/emscripten-core/emsdk.git
     (cd emsdk && ./emsdk install latest && ./emsdk activate latest)
 }
 
 function ci_webassembly_build {
     source emsdk/emsdk_env.sh
-    make ${MAKEOPTS} -C ports/webassembly
+    make ${MAKEOPTS} -C ports/webassembly VARIANT=pyscript submodules
+    make ${MAKEOPTS} -C ports/webassembly VARIANT=pyscript
 }
 
 function ci_webassembly_run_tests {
-    # This port is very slow at running, so only run a few of the tests.
-    (cd tests && MICROPY_MICROPYTHON=../ports/webassembly/node_run.sh ./run-tests.py -j1 basics/builtin_*.py)
+    make -C ports/webassembly VARIANT=pyscript test_min
 }
 
 ########################################################################################
@@ -245,6 +262,25 @@ function ci_qemu_arm_build {
     make ${MAKEOPTS} -C ports/qemu-arm -f Makefile.test test
     make ${MAKEOPTS} -C ports/qemu-arm -f Makefile.test clean
     make ${MAKEOPTS} -C ports/qemu-arm -f Makefile.test BOARD=sabrelite test
+}
+
+########################################################################################
+# ports/qemu-riscv
+
+function ci_qemu_riscv_setup {
+    ci_gcc_riscv_setup
+    sudo apt-get update
+    sudo apt-get install qemu-system
+    qemu-system-riscv32 --version
+}
+
+function ci_qemu_riscv_build {
+    make ${MAKEOPTS} -C mpy-cross
+    make ${MAKEOPTS} -C ports/qemu-riscv submodules
+    make ${MAKEOPTS} -C ports/qemu-riscv
+    make ${MAKEOPTS} -C ports/qemu-riscv clean
+    make ${MAKEOPTS} -C ports/qemu-riscv -f Makefile.test submodules
+    make ${MAKEOPTS} -C ports/qemu-riscv -f Makefile.test test
 }
 
 ########################################################################################
@@ -355,6 +391,12 @@ function ci_stm32_nucleo_build {
     diff $BUILD_WB55/firmware.unpack.dfu $BUILD_WB55/firmware.unpack_no_sk.dfu
 }
 
+function ci_stm32_misc_build {
+    make ${MAKEOPTS} -C mpy-cross
+    make ${MAKEOPTS} -C ports/stm32 BOARD=ARDUINO_GIGA submodules
+    make ${MAKEOPTS} -C ports/stm32 BOARD=ARDUINO_GIGA
+}
+
 ########################################################################################
 # ports/unix
 
@@ -393,7 +435,7 @@ function ci_unix_build_helper {
 }
 
 function ci_unix_build_ffi_lib_helper {
-    $1 $2 -shared -o tests/unix/ffi_lib.so tests/unix/ffi_lib.c
+    $1 $2 -shared -o tests/ports/unix/ffi_lib.so tests/ports/unix/ffi_lib.c
 }
 
 function ci_unix_run_tests_helper {
@@ -499,7 +541,7 @@ function ci_unix_coverage_run_mpy_merge_tests {
 
 function ci_unix_coverage_run_native_mpy_tests {
     MICROPYPATH=examples/natmod/features2 ./ports/unix/build-coverage/micropython -m features2
-    (cd tests && ./run-natmodtests.py "$@" extmod/{btree*,deflate*,framebuf*,heapq*,random*,re*}.py)
+    (cd tests && ./run-natmodtests.py "$@" extmod/*.py)
 }
 
 function ci_unix_32bit_setup {

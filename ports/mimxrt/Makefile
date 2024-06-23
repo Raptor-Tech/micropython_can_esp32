@@ -172,7 +172,8 @@ SRC_HAL_IMX_C += \
 	$(MCU_DIR)/drivers/fsl_common_arm.c \
 	$(MCU_DIR)/drivers/fsl_anatop_ai.c \
 	$(MCU_DIR)/drivers/fsl_caam.c \
-	$(MCU_DIR)/drivers/fsl_lpadc.c
+	$(MCU_DIR)/drivers/fsl_lpadc.c \
+	$(MCU_DIR)/drivers/fsl_mu.c
 else
 SRC_HAL_IMX_C += \
 	$(MCU_DIR)/drivers/fsl_adc.c \
@@ -231,6 +232,8 @@ SHARED_SRC_C += \
 	shared/runtime/stdout_helpers.c \
 	shared/runtime/sys_stdio_mphal.c \
 	shared/timeutils/timeutils.c \
+	shared/tinyusb/mp_usbd.c \
+	shared/tinyusb/mp_usbd_cdc.c \
 
 # Set flash driver name, base address and internal flash flag, based on the flash type.
 ifeq ($(MICROPY_HW_FLASH_TYPE),$(filter $(MICROPY_HW_FLASH_TYPE),qspi_nor_flash))
@@ -267,28 +270,32 @@ ifeq ($(MICROPY_BLUETOOTH_NIMBLE),1)
 SRC_C += mpnimbleport.c
 endif
 
+# Add mimxrt-specific implementation of libmetal (and optionally OpenAMP's rproc).
+# Note: libmetal code is generated via a pre-processor so ensure that runs first.
+ifeq ($(MICROPY_PY_OPENAMP),1)
+SRC_C += mpmetalport.c
+$(BUILD)/mpmetalport.o: $(BUILD)/openamp/metal/config.h
+ifeq ($(MICROPY_PY_OPENAMP_REMOTEPROC),1)
+SRC_C += mpremoteprocport.c
+$(BUILD)/mpremoteprocport.o: $(BUILD)/openamp/metal/config.h
+endif
+endif
+
 # Math library source files
 ifeq ($(MICROPY_FLOAT_IMPL),double)
-    LIBM_SRC_C += $(addprefix lib/libm_dbl/,\
-        __cos.c __expo2.c __fpclassify.c __rem_pio2.c __rem_pio2_large.c __signbit.c __sin.c __tan.c acos.c acosh.c \
-        asin.c asinh.c atan.c atan2.c atanh.c ceil.c copysign.c cos.c cosh.c erf.c exp.c expm1.c floor.c fmod.c \
-        frexp.c ldexp.c lgamma.c log.c log10.c log1p.c modf.c nearbyint.c pow.c rint.c round.c scalbn.c sin.c \
-        sinh.c tan.c tanh.c tgamma.c trunc.c)
+    LIBM_SRC_C += $(SRC_LIB_LIBM_DBL_C)
     #
     ifeq ($(SUPPORTS_HARDWARE_FP_DOUBLE),1)
-        LIBM_SRC_C += lib/libm_dbl/thumb_vfp_sqrt.c
+        LIBM_SRC_C += $(SRC_LIB_LIBM_DBL_SQRT_HW_C)
     else
-        LIBM_SRC_C += lib/libm_dbl/sqrt.c
+        LIBM_SRC_C += $(SRC_LIB_LIBM_DBL_SQRT_SW_C)
     endif
 else
-    LIBM_SRC_C += $(addprefix lib/libm/,\
-        acoshf.c asinfacosf.c asinhf.c atan2f.c atanf.c atanhf.c ef_rem_pio2.c erf_lgamma.c fmodf.c kf_cos.c \
-        kf_rem_pio2.c kf_sin.c kf_tan.c log1pf.c math.c nearbyintf.c roundf.c sf_cos.c sf_erf.c sf_frexp.c sf_ldexp.c \
-        sf_modf.c sf_sin.c sf_tan.c wf_lgamma.c wf_tgamma.c)
+    LIBM_SRC_C += $(SRC_LIB_LIBM_C)
     ifeq ($(SUPPORTS_HARDWARE_FP_SINGLE),1)
-        LIBM_SRC_C += lib/libm/thumb_vfp_sqrtf.c
+        LIBM_SRC_C += $(SRC_LIB_LIBM_SQRT_HW_C)
     else
-        LIBM_SRC_C += lib/libm/ef_sqrt.c
+        LIBM_SRC_C += $(SRC_LIB_LIBM_SQRT_SW_C)
     endif
 endif
 
@@ -439,15 +446,9 @@ endif
 # =============================================================================
 
 LIBS = $(shell $(CC) $(CFLAGS) -print-libgcc-file-name)
-LIBM_O = $(addprefix $(BUILD)/, $(LIBM_SRC_C:.c=.o))
-
-# Too many warnings in libm_dbl, disable for now.
-ifeq ($(MICROPY_FLOAT_IMPL),double)
-$(LIBM_O): CFLAGS := $(filter-out -Wdouble-promotion -Wfloat-conversion, $(CFLAGS))
-endif
 
 OBJ += $(PY_O)
-OBJ += $(LIBM_O)
+OBJ += $(addprefix $(BUILD)/, $(LIBM_SRC_C:.c=.o))
 OBJ += $(addprefix $(BUILD)/, $(SRC_C:.c=.o))
 OBJ += $(addprefix $(BUILD)/, $(SHARED_SRC_C:.c=.o))
 OBJ += $(addprefix $(BUILD)/, $(DRIVERS_SRC_C:.c=.o))
@@ -504,7 +505,7 @@ $(GEN_FLEXRAM_CONFIG_SRC):
 $(BUILD)/%_gen.c $(HEADER_BUILD)/%.h: $(BOARD_PINS) $(MAKE_PINS) $(AF_FILE) $(PREFIX_FILE) | $(HEADER_BUILD)
 	$(ECHO) "Create $@"
 	$(Q)$(PYTHON) $(MAKE_PINS) --board-csv $(BOARD_PINS) --af-csv $(AF_FILE) \
-	    --prefix $(PREFIX_FILE) --iomux $(abspath $(TOP)/$(MCU_DIR)/drivers/fsl_iomuxc.h) \
+	    --prefix $(PREFIX_FILE) --iomux "$(abspath $(TOP)/$(MCU_DIR)/drivers/fsl_iomuxc.h)" \
 	    --output-source $(GEN_PINS_SRC) --output-header $(GEN_PINS_HDR)
 
 include $(TOP)/py/mkrules.mk
