@@ -291,8 +291,12 @@ static mp_obj_t machine_sdcard_make_new(const mp_obj_type_t *type, size_t n_args
     } else {
         // SD/MMC interface
         DEBUG_printf("  Setting up SDMMC slot configuration");
-        sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
-
+        //sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
+        #if defined(MICROPY_HW_SDMMC_SLOT_CONFIG)
+            sdmmc_slot_config_t slot_config = MICROPY_HW_SDMMC_SLOT_CONFIG();
+        #else
+            sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
+        #endif // MICROPY_HW_SDMMC_SLOT_CONFIG
         // Stronger external pull-ups are still needed but apparently
         // it is a good idea to set the internal pull-ups anyway.
         // slot_config.flags = SDMMC_SLOT_FLAG_INTERNAL_PULLUP;

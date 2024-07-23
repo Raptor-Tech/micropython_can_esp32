@@ -168,9 +168,19 @@
 #endif
 #define MICROPY_PY_NETWORK_INCLUDEFILE      "ports/esp32/modnetwork.h"
 #define MICROPY_PY_NETWORK_MODULE_GLOBALS_INCLUDEFILE "ports/esp32/modnetwork_globals.h"
-#ifndef MICROPY_PY_NETWORK_WLAN
+//#ifndef MICROPY_PY_NETWORK_WLAN
+#define MICROPY_PY_USOCKET            (1)
+#define MICROPY_PY_NETWORK_PPPOE      (1)
+#define MICROPY_PY_NETWORK_INTERFACE  (1)
+#define MICROPY_PY_NETWORK_IPv6       (1)
+#define MICROPY_PY_NETWORK_BRIDGING   (1)
+
+
+
+
+
 #define MICROPY_PY_NETWORK_WLAN             (1)
-#endif
+//#endif
 #ifndef MICROPY_HW_ENABLE_SDCARD
 #define MICROPY_HW_ENABLE_SDCARD            (1)
 #endif
@@ -183,6 +193,24 @@
 #define MICROPY_PY_ONEWIRE                  (1)
 #define MICROPY_PY_SOCKET_EVENTS            (MICROPY_PY_WEBREPL)
 #define MICROPY_PY_BLUETOOTH_RANDOM_ADDR    (1)
+
+//add SDMMC
+#define MICROPY_HW_SDMMC_SLOT_CONFIG() {\
+    .clk = GPIO_NUM_16, \
+    .cmd = GPIO_NUM_8, \
+    .d0 = GPIO_NUM_1, \
+    .d1 = GPIO_NUM_NC, \
+    .d2 = GPIO_NUM_NC, \
+    .d3 = GPIO_NUM_NC, \
+    .d4 = GPIO_NUM_NC, \
+    .d5 = GPIO_NUM_NC, \
+    .d6 = GPIO_NUM_NC, \
+    .d7 = GPIO_NUM_NC, \
+    .cd = GPIO_NUM_NC, \
+    .wp = GPIO_NUM_NC, \
+    .width   = 1, \
+    .flags = 0, \
+}
 
 // fatfs configuration
 #define MICROPY_FATFS_ENABLE_LFN            (1)
