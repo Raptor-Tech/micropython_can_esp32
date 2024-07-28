@@ -94,10 +94,10 @@ def pull(f_path,raw_url, no_pull, token = ''):
 def pull_all(tree_url,raw,ignore,no_pull, token = ''):
   os.chdir('/')
   tree = pull_git_tree(tree_url, token=token )
-  internal_tree = build_internal_tree()
-  internal_tree = remove_ignore(internal_tree, ignore = ignore)
-  print(' ignore removed ----------------------')
-  print(internal_tree)
+  #internal_tree = build_internal_tree()
+  #internal_tree = remove_ignore(internal_tree, ignore = ignore)
+  #print(' ignore removed ----------------------')
+  #print(internal_tree)
   log = []
   # download and save all files
   for i in tree['tree']:

@@ -42,7 +42,9 @@ try:
     print(wifi_networks)
     ssids = [net[0] for net in wifi_networks]    
     networks = [{'ssid':'provisionraptor', 'password':'rosCore1!'}]
-
+    if b'provisionraptor' in ssids: retr = 20
+    else: retr = 5
+   
     print(networks)
     connected = 0
     for match in networks:
@@ -52,7 +54,7 @@ try:
                     print("Connecting to wifi...." + str(ssid) + " " + str(match["password"]))
                     print(ssid.decode('utf-8'), match["password"])
                     wlan.connect(ssid.decode('utf-8'), match["password"])
-                    for retries in range(5):
+                    for retries in range(retr):
                         time.sleep(2)
                         if wlan.isconnected():
                             wlan_reconnect_timer  = time.ticks_ms()
@@ -67,7 +69,7 @@ try:
                 telnet.start(wlan)    
                 debug = machine.UART(1, baudrate=115200, tx=42,rx=41)
                 os.dupterm(debug)
-                break
+                breakline
             else: time.sleep(1) 
 
 except Exception as e: print("BOOT SEQUENCE FAILED: " + str(e))
