@@ -7,6 +7,13 @@
 This has been necessary in order to prevent runtime crash when calling `socket.getaddrinfo(...)` when code has been compiled with latest patches of `esp_idf`.
 All recent version seem to be affected ie `v5.1`, `5.2`, `5.3`, `5.4`.
 
+[611d8f9ce82ab5e04fb86ab6cfc28d5ed98f33bf](https://github.com/micropython/micropython/commit/611d8f9ce82ab5e04fb86ab6cfc28d5ed98f33bf) </br>
+(https://github.com/micropython/micropython-esp32/issues/204)</br>
+(https://github.com/micropython/micropython/issues/15841)</br>
+(https://github.com/lvgl-micropython/lvgl_micropython/issues/221)</br>
+(https://github.com/micropython/micropython/pull/16210)</br>
+
+
 ## Building
 
 Espressif IDF `esp_idf` is in `~/src/esp/esp_idf`
