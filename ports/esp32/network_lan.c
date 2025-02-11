@@ -156,6 +156,9 @@ static mp_obj_t get_lan(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_ar
         #if CONFIG_ETH_SPI_ETHERNET_W5500
         args[ARG_phy_type].u_int != PHY_W5500 &&
         #endif
+        #if CONFIG_ETH_SPI_ETHERNET_A2111
+        args[ARG_phy_type].u_int != PHY_A2111 &&
+        #endif
         #endif
         args[ARG_phy_type].u_int != PHY_DP83848) {
         mp_raise_ValueError(MP_ERROR_TEXT("invalid phy type"));
@@ -250,6 +253,16 @@ static mp_obj_t get_lan(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_ar
             chip_config.int_gpio_num = self->phy_int_pin;
             mac = esp_eth_mac_new_w5500(&chip_config, &mac_config);
             self->phy = esp_eth_phy_new_w5500(&phy_config);
+            break;
+        }
+        #endif
+        #if CONFIG_ETH_SPI_ETHERNET_A2111
+        case PHY_A2111: {
+            spi_host_device_t host = machine_hw_spi_get_host(args[ARG_spi].u_obj);
+            eth_a2111_config_t chip_config = ETH_A2111_DEFAULT_CONFIG(host, &devcfg);
+            chip_config.int_gpio_num = self->phy_int_pin;
+            mac = esp_eth_mac_new_a2111(&chip_config, &mac_config);
+            self->phy = esp_eth_phy_new_a2111(&phy_config);
             break;
         }
         #endif
