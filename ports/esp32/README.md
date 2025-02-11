@@ -13,6 +13,24 @@ All recent version seem to be affected ie `v5.1`, `5.2`, `5.3`, `5.4`.
 (https://github.com/lvgl-micropython/lvgl_micropython/issues/221)</br>
 (https://github.com/micropython/micropython/pull/16210)</br>
 
+## Setting Up espresso IDF
+
+assuming using `bash`
+in `esp_idf`
+
+```
+./install.sh
+```
+
+in any shells you wish to use for building the firmware.
+
+```
+. ~/src/esp/esp_idf/export.sh
+```
+
+Adjust parent directories as required based on the location of the idf and micropython sources.
+
+(https://github.com/micropython/micropython/blob/master/ports/esp32/README.md)
 
 ## Building
 
@@ -41,6 +59,8 @@ make -C ~/src/esp/micropython_can_esp32/mpy-cross
 ```
 
 from anywhere
+
+The above is only required when setting up the micropython environment for the first time.  I have been running it after swapping between `esp_idf` versions but I'm not absolutely sure that is necessary.
 
 In `ports/esp32`
 ```
