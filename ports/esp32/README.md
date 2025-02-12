@@ -87,11 +87,21 @@ replace `ttyUSBX` with `ttyUSB0`, `ttyUSB1`, `ttyUSB2`, `ttyUSB3` or other as is
 
 ## WSL
 
+See [Connect USB devices](https://learn.microsoft.com/en-us/windows/wsl/connect-usb) for alternative ways of installing `usbipd` and a full explanation of the following commands for binding USB devices to WSL.
+
+If not already installed it will be necessary to install `usbipd`
+
+```
+winget install --interactive --exact dorssel.usbipd-win
+```
+
 It will be necessary to share/bind the USB devices for the com ports with WSL.
 
 ```
 usbipd list
 ```
+
+Substitute x-x in the following commands based on the displayed list and desired devices.
 
 ```
 usbipd bind --busid x-x
