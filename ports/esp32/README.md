@@ -13,6 +13,8 @@ All recent version seem to be affected ie `v5.1`, `5.2`, `5.3`, `5.4`.
 [Ref](https://github.com/lvgl-micropython/lvgl_micropython/issues/221)</br>
 [Ref](https://github.com/micropython/micropython/pull/16210)</br>
 
+Just as a warning this is not specific to the LAN and will also crashing with attempts to create WLAN socket connections as calling `socket.getaddrinfo(...)` also required.
+
 ## Setting Up espresso IDF
 
 assuming using `bash`
@@ -20,6 +22,10 @@ in `esp_idf`
 
 ```
 ./install.sh
+```
+or the following may prevent installing support for unnecessary CPUs.
+```
+./install.sh esp32
 ```
 
 in any shells you wish to use for building the firmware.
@@ -29,6 +35,15 @@ in any shells you wish to use for building the firmware.
 ```
 
 Adjust parent directories as required based on the location of the idf and micropython sources.
+
+I have been working with v5.2 which seems to be able to compile our old micropython with CAN and W5500 after being patched with the above patch.
+
+I have not been able to compile with v5.3 (compile errors in nimble) and so I have had to redo the duplication o fthe PHY_W5500 as PHY_A2111 which I had previously done with micropython v1.23 or v1.24 and esp-idf v5.3.
+
+It seems there were some changes with esp_eth the w5500 between esp-idf v5.2 and v5.3 as the patches I made from v5.3 didn't seem to work but it was not hard to reproduce the duplication for v5.2 
+
+I have tested the duplicated driver to the point of getting it's IP address via DHCP.
+It remains to retarget the duplicate A2111 driver to the associated hardware.
 
 [ORIGINAL README](README%2DMPORIG.md)
 
