@@ -42,6 +42,8 @@ jobs:
           configuration: Debug
         - visualstudio: '2019'
           configuration: Debug
+    env:
+      CI_BUILD_CONFIGURATION: ${{ matrix.configuration }}
     runs-on: ${{ matrix.runner }}
     steps:
     - name: Install Visual Studio 2017
@@ -108,16 +110,11 @@ jobs:
       run:
         shell: msys2 {0}
     steps:
-    - name: Get Python path
-      id: python_path
-      shell: python
-      run: |
-        import os
-        import sys
-        output = f"python={os.fspath(sys.executable)}"
-        print(output)
-        with open(os.environ["GITHUB_OUTPUT"], "w") as f:
-            f.write(output)
+    - uses: actions/setup-python@v5
+      # note: can go back to installing mingw-w64-${{ matrix.env }}-python after
+      # MSYS2 updates to Python >3.12 (due to settrace compatibility issue)
+      with:
+        python-version: '3.11'
     - uses: msys2/setup-msys2@v2
       with:
         msystem: ${{ matrix.sys }}
@@ -126,9 +123,9 @@ jobs:
           make
           mingw-w64-${{ matrix.env }}-gcc
           pkg-config
-          python3
           git
           diffutils
+        path-type: inherit  # Remove when setup-python is removed
     - uses: actions/checkout@v4
     - name: Build mpy-cross.exe
       run: make -C mpy-cross -j2
@@ -138,8 +135,7 @@ jobs:
       run: make -C ports/windows -j2 VARIANT=${{ matrix.variant }}
     - name: Run tests
       id: test
-      # msys python breaks tests so we need to use "real" windows python
-      run: MICROPY_CPYTHON3=$(cygpath "${{ steps.python_path.outputs.python }}") make -C ports/windows test_full VARIANT=${{ matrix.variant }}
+      run: make -C ports/windows test_full VARIANT=${{ matrix.variant }}
     - name: Print failures
       if: failure() && steps.test.conclusion == 'failure'
       working-directory: tests

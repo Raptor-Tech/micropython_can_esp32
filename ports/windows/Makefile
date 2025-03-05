@@ -42,6 +42,10 @@ INC += -I$(VARIANT_DIR)
 CFLAGS += $(INC) -Wall -Wpointer-arith -Wdouble-promotion -Werror -std=gnu99 -DUNIX -D__USE_MINGW_ANSI_STDIO=1 $(COPT) $(CFLAGS_EXTRA)
 LDFLAGS += -lm -lbcrypt $(LDFLAGS_EXTRA)
 
+# Force the use of 64-bits for file sizes in C library functions on 32-bit platforms.
+# This option has no effect on 64-bit builds.
+CFLAGS += -D_FILE_OFFSET_BITS=64
+
 # Debugging/Optimization
 ifdef DEBUG
 CFLAGS += -g
@@ -101,6 +105,9 @@ include $(TOP)/py/mkrules.mk
 
 .PHONY: test test_full
 
+# Note for recent gcc versions like 13.2:
+# - mingw64-x86_64 gcc builds will pass the math_domain_special test
+# - mingw64-ucrt64 gcc builds will pass all of the below tests
 RUN_TESTS_SKIP += -e math_fun -e float2int_double -e float_parse -e math_domain_special
 
 test: $(BUILD)/$(PROG) $(TOP)/tests/run-tests.py

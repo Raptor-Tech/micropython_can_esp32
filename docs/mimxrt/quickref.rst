@@ -193,7 +193,7 @@ PWM Constructor
 
       - *freq* should be an integer which sets the frequency in Hz for the
         PWM cycle. The valid frequency range is 15 Hz resp. 18Hz resp. 24Hz up to > 1 MHz.
-      - *duty_u16* sets the duty cycle as a ratio ``duty_u16 / 65536``.
+      - *duty_u16* sets the duty cycle as a ratio ``duty_u16 / 65535``.
         The duty cycle of a X channel can only be changed, if the A and B channel
         of the respective submodule is not used. Otherwise the duty_16 value of the
         X channel is 32768 (50%).
@@ -231,7 +231,7 @@ is created by dividing the pwm_clk signal by an integral factor, according to th
 
     f = pwm_clk / (2**n * m)
 
-with n being in the range of 0..7, and m in the range of 2..65536. pmw_clk is 125Mhz
+with n being in the range of 0..7, and m in the range of 2..65535. pmw_clk is 125Mhz
 for MIMXRT1010/1015/1020, 150 MHz for MIMXRT1050/1060/1064 and 160MHz for MIMXRT1170.
 The lowest frequency is pwm_clk/2**23 (15, 18, 20Hz). The highest frequency with
 U16 resolution is pwm_clk/2**16 (1907, 2288, 2441 Hz), the highest frequency
@@ -255,7 +255,7 @@ Use the :ref:`machine.ADC <machine.ADC>` class::
     from machine import ADC
 
     adc = ADC(Pin('A2'))        # create ADC object on ADC pin
-    adc.read_u16()              # read value, 0-65536 across voltage range 0.0v - 3.3v
+    adc.read_u16()              # read value, 0-65535 across voltage range 0.0v - 3.3v
 
 The resolution of the ADC is 12 bit with 10 to 11 bit accuracy, irrespective of the
 value returned by read_u16(). If you need a higher resolution or better accuracy, use
@@ -429,7 +429,9 @@ See :ref:`machine.RTC <machine.RTC>`::
     from machine import RTC
 
     rtc = RTC()
-    rtc.datetime((2017, 8, 23, 1, 12, 48, 0, 0)) # set a specific date and time
+    rtc.datetime((2017, 8, 23, 0, 1, 12, 48, 0)) # set a specific date and
+                                                 # time, eg. 2017/8/23 1:12:48
+                                                 # the day-of-week value is ignored
     rtc.datetime() # get date and time
     rtc.now() # return date and time in CPython format.
 
@@ -437,6 +439,10 @@ The i.MXRT MCU supports battery backup of the RTC.  By connecting a battery of
 1.5-3.6V, time and date are maintained in the absence of the main power.  The
 current drawn from the battery is ~20µA, which is rather high.  A CR2032 coin
 cell will last for about one year.
+
+Note: In v1.23.0 the support for subseconds was removed. When reading the RTC, 0 will
+be returned as value for subsecond, When setting the RTC time, the subsecond
+field is ignored. The RTC itself does not provide a microsecond value.
 
 SD card
 -------
@@ -528,7 +534,7 @@ Ethernet.  Example usage::
     lan.active(True)
 
 If there is a DHCP server in the LAN, the IP address is supplied by that server.
-Otherwise, the IP address can be set with lan.ifconfig().  The default address
+Otherwise, the IP address can be set with lan.ipconfig(addr4="...").  The default address
 is 192.168.0.1.
 
 Teensy 4.1 does not have an Ethernet jack on the board, but PJRC offers an

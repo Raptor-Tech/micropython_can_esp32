@@ -166,7 +166,7 @@ static mp_obj_t esp_network_ipconfig(size_t n_args, const mp_obj_t *args, mp_map
             case MP_QSTR_dns: {
                 char addr_str[IPADDR_STRLEN_MAX];
                 ipaddr_ntoa_r(dns_getserver(0), addr_str, sizeof(addr_str));
-                return mp_obj_new_str(addr_str, strlen(addr_str));
+                return mp_obj_new_str_from_cstr(addr_str);
             }
             default: {
                 mp_raise_ValueError(MP_ERROR_TEXT("unexpected key"));
@@ -328,7 +328,7 @@ mp_obj_t esp_ifname(esp_netif_t *netif) {
     char ifname[NETIF_NAMESIZE + 1] = {0};
     mp_obj_t ret = mp_const_none;
     if (esp_netif_get_netif_impl_name(netif, ifname) == ESP_OK && ifname[0] != 0) {
-        ret = mp_obj_new_str((char *)ifname, strlen(ifname));
+        ret = mp_obj_new_str_from_cstr((char *)ifname);
     }
     return ret;
 }
@@ -337,11 +337,3 @@ static mp_obj_t esp_phy_mode(size_t n_args, const mp_obj_t *args) {
     return mp_const_none;
 }
 MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(esp_network_phy_mode_obj, 0, 1, esp_phy_mode);
-
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 2, 0)
-_Static_assert(WIFI_AUTH_MAX == 13, "Synchronize WIFI_AUTH_XXX constants with the ESP-IDF. Look at esp-idf/components/esp_wifi/include/esp_wifi_types.h");
-#elif ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 5) && ESP_IDF_VERSION < ESP_IDF_VERSION_VAL(5, 1, 0) || ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 2)
-_Static_assert(WIFI_AUTH_MAX == 11, "Synchronize WIFI_AUTH_XXX constants with the ESP-IDF. Look at esp-idf/components/esp_wifi/include/esp_wifi_types.h");
-#else
-_Static_assert(WIFI_AUTH_MAX == 10, "Synchronize WIFI_AUTH_XXX constants with the ESP-IDF. Look at esp-idf/components/esp_wifi/include/esp_wifi_types.h");
-#endif

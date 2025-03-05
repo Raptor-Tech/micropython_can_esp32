@@ -139,7 +139,7 @@ mp_import_stat_t mp_vfs_import_stat(const char *path) {
     }
 
     // delegate to vfs.stat() method
-    mp_obj_t path_o = mp_obj_new_str(path_out, strlen(path_out));
+    mp_obj_t path_o = mp_obj_new_str_from_cstr(path_out);
     mp_obj_t stat;
     nlr_buf_t nlr;
     if (nlr_push(&nlr) == 0) {
@@ -273,7 +273,7 @@ mp_obj_t mp_vfs_umount(mp_obj_t mnt_in) {
         mnt_str = mp_obj_str_get_data(mnt_in, &mnt_len);
     }
     for (mp_vfs_mount_t **vfsp = &MP_STATE_VM(vfs_mount_table); *vfsp != NULL; vfsp = &(*vfsp)->next) {
-        if ((mnt_str != NULL && !memcmp(mnt_str, (*vfsp)->str, mnt_len + 1)) || (*vfsp)->obj == mnt_in) {
+        if ((mnt_str != NULL && mnt_len == (*vfsp)->len && !memcmp(mnt_str, (*vfsp)->str, mnt_len)) || (*vfsp)->obj == mnt_in) {
             vfs = *vfsp;
             *vfsp = (*vfsp)->next;
             break;
@@ -443,6 +443,8 @@ mp_obj_t mp_vfs_listdir(size_t n_args, const mp_obj_t *args) {
 }
 MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mp_vfs_listdir_obj, 0, 1, mp_vfs_listdir);
 
+#if MICROPY_VFS_WRITABLE
+
 mp_obj_t mp_vfs_mkdir(mp_obj_t path_in) {
     mp_obj_t path_out;
     mp_vfs_mount_t *vfs = lookup_path(path_in, &path_out);
@@ -478,6 +480,8 @@ mp_obj_t mp_vfs_rmdir(mp_obj_t path_in) {
     return mp_vfs_proxy_call(vfs, MP_QSTR_rmdir, 1, &path_out);
 }
 MP_DEFINE_CONST_FUN_OBJ_1(mp_vfs_rmdir_obj, mp_vfs_rmdir);
+
+#endif // MICROPY_VFS_WRITABLE
 
 mp_obj_t mp_vfs_stat(mp_obj_t path_in) {
     mp_obj_t path_out;
