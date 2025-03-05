@@ -68,10 +68,10 @@ try:
             if wlan.isconnected():
                 telnet.start(wlan)    
                 debug = machine.UART(1, baudrate=115200, tx=42,rx=41)
-                os.dupterm(debug)
-                breakline
+                #os.dupterm(debug)
+                #breakline
+		break
             else: time.sleep(1) 
 
 except Exception as e: print("BOOT SEQUENCE FAILED: " + str(e))
 print("Boot sequence completed")
-

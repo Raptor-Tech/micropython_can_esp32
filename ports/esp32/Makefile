@@ -27,7 +27,7 @@ BUILD ?= build-$(BOARD)-$(BOARD_VARIANT)
 else
 BUILD ?= build-$(BOARD)
 endif
-USER_C_MODULES = /home/jean_ferreira/ulab/code/micropython.cmake
+USER_C_MODULES = /home/jean_ferreira_raptortech_com_au/ulab/code/micropython.cmake
 # Device serial settings.
 PORT ?= /dev/ttyUSB0
 BAUD ?= 460800
