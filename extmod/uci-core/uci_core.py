@@ -3,38 +3,36 @@ import time
 import _thread
 
 class UciCoreDriverSPI:
-    def __init__(self, spi_id=1, baudrate=1000000, sck=18, mosi=23, miso=19, cs=5, ce=6, irq=22):
+    def __init__(self, spi_id=2, baudrate=1000000, sck=20, mosi=8, miso=19, cs=3, ce=18, irq=9):
         """Initialize the UCI Core driver with SPI and control pins."""
         self.cs = machine.Pin(cs, machine.Pin.OUT)
         self.ce = machine.Pin(ce, machine.Pin.OUT)  # Chip Enable pin
-        self.irq = machine.Pin(irq, machine.Pin.IN, machine.Pin.IRQ_FALLING, handler=self._irq_handler)
+        self.irq = machine.Pin(irq, machine.Pin.IN)
+        self.irq.irq(trigger=machine.Pin.IRQ_FALLING, handler=self._irq_handler)
         
         self.spi = machine.SPI(spi_id, baudrate=baudrate, sck=machine.Pin(sck),
                                mosi=machine.Pin(mosi), miso=machine.Pin(miso))
         self.lock = _thread.allocate_lock()
+        self.notification_semaphore = _thread.allocate_lock()
+        self.notification_data = None
         
         self.cs.value(1)  # Deselect the UWB chip initially
         self.ce.value(0)  # Keep Chip Enable low initially
         
-    def low_level_initialize(self, firmware_path: str):
-        """Perform low-level initialization including firmware download from external file."""
-        print("Starting low-level initialization...")
-        
-        # Enable chip
-        self.ce.value(1)
-        time.sleep(0.01)  # Allow stabilization
-        
-        # Load and write firmware from file
-        if not self.write_firmware_to_device(firmware_path):
-            print("Firmware write failed.")
-            return False
-        
-        print("Low-level initialization complete.")
-        return True
-    
     def _irq_handler(self, pin):
         """IRQ handler triggered on notification arrival."""
-        print("IRQ triggered - handling event")
+        self.notification_data = self.read_response(10)
+        if not self.notification_semaphore.locked():
+            self.notification_semaphore.acquire()
+    
+    def wait_for_notification(self, expected_code, timeout=5):
+        """Wait for a specific notification using a semaphore, with timeout."""
+        if not self.notification_semaphore.acquire(timeout=timeout):
+            print("Notification timeout occurred")
+            return None
+        if self.notification_data and self.notification_data[0] == expected_code:
+            return self.notification_data
+        return None
     
     def send_command(self, command: bytes):
         """Send a command to the UCI Core over SPI."""
