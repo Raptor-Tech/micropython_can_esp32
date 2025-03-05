@@ -4,7 +4,7 @@ import _thread
 import binascii
 
 class UciCoreDriverSPI:
-    def __init__(self, firmware_path: str, spi_id=2, baudrate=1000000, sck=20, mosi=8, miso=19, cs=3, ce=18, irq=9):
+    def __init__(self, spi_id=2, baudrate=1000000, sck=20, mosi=8, miso=19, cs=3, ce=18, irq=9):
         """Initialize the UCI Core driver with SPI and control pins."""
         self.cs = machine.Pin(cs, machine.Pin.OUT)
         self.ce = machine.Pin(ce, machine.Pin.OUT)  # Chip Enable pin
