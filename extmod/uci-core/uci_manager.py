@@ -1,20 +1,23 @@
-from micropython_uci_core import UciCoreDriverSPI
+from uci_core_driver import UciCoreDriverSPI
 import time
 
 class UciManager:
-    """Higher-level UWB session and configuration management."""
+    """High-level UWB session and configuration management."""
     def __init__(self):
         self.uci = UciCoreDriverSPI()
     
     def initialize_device(self):
         """Perform full device initialization and capability check."""
         print("Initializing UWB device...")
-        response = self.uci.init_device()
+        response = self.uci.reset_device()
         if response:
-            print("Device initialized successfully.")
+            print("Device reset successfully.")
+        device_info = self.uci.get_device_info()
+        if device_info:
+            print("Device Info:", device_info)
         else:
             print("Device initialization failed.")
-        return response
+        return device_info
     
     def configure_uwb(self, config_id, value):
         """Set a UWB configuration and ensure it applies correctly."""
@@ -60,13 +63,17 @@ class UciManager:
         print(f"Max Supported UWB Sessions: {max_sessions}")
         return max_sessions
     
+    def get_uwbs_state(self):
+        """Retrieve the current UWB state."""
+        return self.uci.get_uwbs_state()
+    
 if __name__ == "__main__":
     manager = UciManager()
     manager.initialize_device()
     manager.configure_uwb(0x01, b'\x01')
     manager.start_session(0x12345678)
-    time.sleep(5)  # Simulate active session
-    manager.get_active_sessions()
+    time.sleep(5)  # Simulate active sessionmanager.get_active_sessions()
     manager.stop_session(0x12345678)
     manager.get_max_sessions()
+    print("Current UWBS State:", manager.get_uwbs_state())
 
