@@ -87,6 +87,12 @@ class UciCoreDriverSPI:
         scan_command = b'\x00\x08'  # Placeholder command for scanning
         self.send_command(scan_command)
         return self.read_response(64)  # Expecting a list of detected devices
+    
+    def get_session_count(self):
+        """Retrieve the number of active UWB sessions."""
+        command = b'\x00\x09'  # CORE_GET_SESSION_COUNT_CMD
+        self.send_command(command)
+        return self.read_response(2)  # Expecting a 2-byte response for session count
 
 if __name__ == "__main__":
     uci_driver = UciCoreDriverSPI()
@@ -117,6 +123,10 @@ if __name__ == "__main__":
     print("Scanning for UWB devices...")
     scan_resp = uci_driver.scan_uwb_devices()
     print("Detected UWB Devices:", scan_resp)
+    
+    print("Getting session count...")
+    session_count_resp = uci_driver.get_session_count()
+    print("Active UWB Sessions:", session_count_resp)
     
     print("Stopping ranging session...")
     stop_resp = uci_driver.stop_ranging(0x12345678)
