@@ -42,6 +42,14 @@ class UciCoreDriverSPI:
             time.sleep(0.01)  # Allow processing time
             self.cs.value(1)  # Deselect the UWB chip
     
+    def read_response(self, length=10):
+        """Read response from UCI Core via SPI."""
+        with self.lock:
+            self.cs.value(0)  # Select the UWB chip
+            response = self.spi.read(length)  # Read response bytes
+            self.cs.value(1)  # Deselect the UWB chip
+        return response
+    
     def write_firmware_to_device(self, firmware_path: str):
         """Write firmware from an external .bin file to the UWB chip over SPI."""
         print(f"Loading firmware from {firmware_path}...")
@@ -66,4 +74,3 @@ class UciCoreDriverSPI:
         
         print("Firmware write complete!")
         return True
-
