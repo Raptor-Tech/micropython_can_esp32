@@ -4,7 +4,7 @@ import _thread
 import binascii
 
 class UciCoreDriverSPI:
-    def __init__(self, spi_id=2, baudrate=1000000, sck=20, mosi=8, miso=19, cs=3, ce=18, irq=9):
+    def __init__(self, firmware_path: str, spi_id=2, baudrate=1000000, sck=20, mosi=8, miso=19, cs=3, ce=18, irq=9):
         """Initialize the UCI Core driver with SPI and control pins."""
         self.cs = machine.Pin(cs, machine.Pin.OUT)
         self.ce = machine.Pin(ce, machine.Pin.OUT)  # Chip Enable pin
@@ -20,19 +20,47 @@ class UciCoreDriverSPI:
         self.cs.value(1)  # Deselect the UWB chip initially
         self.ce.value(0)  # Keep Chip Enable low initially
         
+        # Perform low-level initialization including firmware loading
+        self.low_level_initialize('H1_IOT.SR150_FACTORY_PROD_FW_46.41.06_0052bbfed983a1f1.bin')
+        #self.low_level_initialize('H1_IOT.SR150_MAINLINE_PROD_FW_46.41.06_0052bbfed983a1f1.bin')
+    
+    def low_level_initialize(self, firmware_path: str):
+        """Perform low-level initialization including firmware download from external file."""
+        print("Starting low-level initialization...")
+        
+        # Enable chip
+        self.ce.value(1)
+        time.sleep(0.01)  # Allow stabilization
+        
+        # Load and write firmware from file
+        if not self.write_firmware_to_device(firmware_path):
+            print("Firmware write failed.")
+            return False
+        
+        print("Low-level initialization complete.")
+        return True
+    
     def _irq_handler(self, pin):
         """IRQ handler triggered on notification arrival."""
         self.notification_data = self.read_response(10)
         if not self.notification_semaphore.locked():
-            self.notification_semaphore.acquire()
+            self.notification_semaphore.release()
     
     def wait_for_notification(self, expected_code, timeout=5):
-        """Wait for a specific notification using a semaphore, with timeout."""
-        if not self.notification_semaphore.acquire(timeout=timeout):
+        """Wait for a specific notification using a semaphore and a timer-based timeout."""
+        def timeout_handler(timer):
+            self.notification_semaphore.release()  # Unblock waiting thread on timeout
+        
+        timer = machine.Timer(-1)
+        timer.init(period=timeout * 1000, mode=machine.Timer.ONE_SHOT, callback=timeout_handler)
+        
+        try:
+            self.notification_semaphore.acquire()  # Block until released by IRQ or timeout
+            if self.notification_data and self.notification_data[0] == expected_code:
+                timer.deinit()
+                return self.notification_data
+        except:
             print("Notification timeout occurred")
-            return None
-        if self.notification_data and self.notification_data[0] == expected_code:
-            return self.notification_data
         return None
     
     def send_command(self, command: bytes):
