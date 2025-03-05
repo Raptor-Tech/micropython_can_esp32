@@ -1,6 +1,7 @@
 import machine
 import time
 import _thread
+import binascii
 
 class UciCoreDriverSPI:
     def __init__(self, spi_id=2, baudrate=1000000, sck=20, mosi=8, miso=19, cs=3, ce=18, irq=9):
@@ -35,19 +36,21 @@ class UciCoreDriverSPI:
         return None
     
     def send_command(self, command: bytes):
-        """Send a command to the UCI Core over SPI."""
+        """Send a command to the UCI Core over SPI with diagnostic output."""
         with self.lock:
             self.cs.value(0)  # Select the UWB chip
+            print(f"Sending SPI command: {binascii.hexlify(command).decode()}")
             self.spi.write(command)
             time.sleep(0.01)  # Allow processing time
             self.cs.value(1)  # Deselect the UWB chip
     
     def read_response(self, length=10):
-        """Read response from UCI Core via SPI."""
+        """Read response from UCI Core via SPI with diagnostic output."""
         with self.lock:
             self.cs.value(0)  # Select the UWB chip
             response = self.spi.read(length)  # Read response bytes
             self.cs.value(1)  # Deselect the UWB chip
+        print(f"Received SPI response: {binascii.hexlify(response).decode()}")
         return response
     
     def write_firmware_to_device(self, firmware_path: str):
@@ -70,7 +73,8 @@ class UciCoreDriverSPI:
             chunk = firmware_data[offset:offset + chunk_size]
             self.send_command(chunk)
             offset += chunk_size
-            print(f"Firmware write progress: {offset}/{total_size} bytes")
+            print(f"Firmware write progress: {offset}/{total_size} bytes\r", end="")
         
         print("Firmware write complete!")
         return True
+

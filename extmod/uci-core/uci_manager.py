@@ -146,3 +146,4 @@ if __name__ == "__main__":
     manager.stop_session(0x12345678)
     print("Max Sessions Supported:", manager.get_max_sessions())
     print("Current UWBS State:", manager.get_uwbs_state())
+
