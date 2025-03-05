@@ -12,6 +12,12 @@ CORE_STOP_RANGING_CMD = b'\x00\x06'
 CORE_GET_SESSION_COUNT_CMD = b'\x00\x09'
 CORE_GET_MAX_SESSIONS_CMD = b'\x00\x0A'
 
+# UCI Response Codes
+DEVICE_RESET_RSP = 0x00
+CALIBRATION_APPLY_RSP = 0x0C
+CONFIG_STATUS_RSP = 0x03
+SESSION_STATUS_RSP = 0x05
+
 # UCI Notification Codes
 DEVICE_STATUS_NTF = 0x01
 CALIBRATION_APPLY_NTF = 0x40
@@ -50,7 +56,7 @@ class UciManager:
         print("Initializing UWB device...")
         
         self.uci.send_command(DEVICE_RESET_CMD)
-        response = self.wait_for_response(DEVICE_STATUS_NTF)
+        response = self.wait_for_response(DEVICE_RESET_RSP)
         notification = self.wait_for_notification(DEVICE_STATUS_NTF)
         
         if not response or not notification:
@@ -70,7 +76,7 @@ class UciManager:
         """Apply calibration values after device reset."""
         print("Applying calibration values...")
         self.uci.send_command(CORE_APPLY_CALIBRATION_CMD)
-        response = self.wait_for_response(CALIBRATION_APPLY_NTF)
+        response = self.wait_for_response(CALIBRATION_APPLY_RSP)
         notification = self.wait_for_notification(CALIBRATION_APPLY_NTF)
         
         if response and notification:
@@ -84,7 +90,7 @@ class UciManager:
         print(f"Setting config {config_id} to {value}...")
         command = CORE_SET_CONFIG_CMD + bytes([config_id, len(value)]) + value
         self.uci.send_command(command)
-        response = self.wait_for_response(CONFIG_STATUS_NTF)
+        response = self.wait_for_response(CONFIG_STATUS_RSP)
         notification = self.wait_for_notification(CONFIG_STATUS_NTF)
         return response is not None and notification is not None
     
@@ -93,7 +99,7 @@ class UciManager:
         print(f"Starting UWB session {session_id}...")
         command = CORE_START_RANGING_CMD + session_id.to_bytes(4, 'little')
         self.uci.send_command(command)
-        response = self.wait_for_response(SESSION_STATUS_NTF)
+        response = self.wait_for_response(SESSION_STATUS_RSP)
         notification = self.wait_for_notification(SESSION_STATUS_NTF)
         
         if response and notification:
@@ -106,7 +112,7 @@ class UciManager:
         print(f"Stopping UWB session {session_id}...")
         command = CORE_STOP_RANGING_CMD + session_id.to_bytes(4, 'little')
         self.uci.send_command(command)
-        response = self.wait_for_response(SESSION_STATUS_NTF)
+        response = self.wait_for_response(SESSION_STATUS_RSP)
         notification = self.wait_for_notification(SESSION_STATUS_NTF)
         
         if response and notification:
