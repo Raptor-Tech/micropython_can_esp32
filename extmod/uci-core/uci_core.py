@@ -93,6 +93,12 @@ class UciCoreDriverSPI:
         command = b'\x00\x09'  # CORE_GET_SESSION_COUNT_CMD
         self.send_command(command)
         return self.read_response(2)  # Expecting a 2-byte response for session count
+    
+    def get_max_sessions(self):
+        """Retrieve the maximum number of supported UWB sessions."""
+        command = b'\x00\x0A'  # CORE_GET_MAX_SESSIONS_CMD (hypothetical)
+        self.send_command(command)
+        return self.read_response(2)  # Expecting a 2-byte response for max session count
 
 if __name__ == "__main__":
     uci_driver = UciCoreDriverSPI()
@@ -109,7 +115,7 @@ if __name__ == "__main__":
     print("Set Config Response:", set_resp)
     
     print("Getting config...")
-    get_resp = uci_driver.get_config(0x01)
+    get_resp = self.driver.get_config(0x01)
     print("Get Config Response:", get_resp)
     
     print("Starting ranging session...")
@@ -127,6 +133,10 @@ if __name__ == "__main__":
     print("Getting session count...")
     session_count_resp = uci_driver.get_session_count()
     print("Active UWB Sessions:", session_count_resp)
+    
+    print("Getting max supported sessions...")
+    max_sessions_resp = uci_driver.get_max_sessions()
+    print("Max UWB Sessions Supported:", max_sessions_resp)
     
     print("Stopping ranging session...")
     stop_resp = uci_driver.stop_ranging(0x12345678)
