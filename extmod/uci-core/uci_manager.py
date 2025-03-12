@@ -35,34 +35,32 @@ class UciManager:
         self.uci = UciCoreDriverSPI(firmware_path)
         self.uwbs_state = UWBS_STATE_INACTIVE  # Initial UWB state
     
-    def wait_for_response(self, expected_response_code, timeout=5):
-        """Wait for a response from the UCI core and validate its contents."""
+    def send_command_and_wait(self, command, expected_response_code, expected_notification_code=None, timeout=5):
+        """Send a command, wait for a response, and optionally a notification."""
+        self.uci.send_command(command)
+        
         response = self.uci.read_response()
         if not response or response[0] != expected_response_code:
-            print(f"Expected response {expected_response_code} not received or incorrect: {response}")
+            print(f"Unexpected or missing response. Expected: {expected_response_code}, Received: {response}")
             return None
+        
+        if expected_notification_code:
+            notification = self.uci.wait_for_notification(expected_notification_code, timeout)
+            if not notification or notification[0] != expected_notification_code:
+                print(f"Expected notification {expected_notification_code} not received or incorrect: {notification}")
+                return None
+            return response, notification
+        
         return response
-    
-    def wait_for_notification(self, expected_notification_code, timeout=5):
-        """Wait for a notification from the UCI core and validate its contents."""
-        notification = self.uci.wait_for_notification(expected_notification_code, timeout)
-        if not notification or notification[0] != expected_notification_code:
-            print(f"Expected notification {expected_notification_code} not received or incorrect: {notification}")
-            return None
-        return notification
     
     def initialize_device(self):
         """Perform full device initialization and capability check."""
         print("Initializing UWB device...")
         
-        self.uci.send_command(DEVICE_RESET_CMD)
-        response = self.wait_for_response(DEVICE_RESET_RSP)
-        notification = self.wait_for_notification(DEVICE_STATUS_NTF)
-        
-        if not response or not notification:
+        result = self.send_command_and_wait(DEVICE_RESET_CMD, DEVICE_RESET_RSP, DEVICE_STATUS_NTF)
+        if not result:
             print("Device reset failed.")
             return False
-        print("Device reset successfully.")
         
         if not self.apply_calibration():
             print("Calibration application failed.")
@@ -75,34 +73,22 @@ class UciManager:
     def apply_calibration(self):
         """Apply calibration values after device reset."""
         print("Applying calibration values...")
-        self.uci.send_command(CORE_APPLY_CALIBRATION_CMD)
-        response = self.wait_for_response(CALIBRATION_APPLY_RSP)
-        notification = self.wait_for_notification(CALIBRATION_APPLY_NTF)
-        
-        if response and notification:
-            print("Calibration applied successfully.")
-            return True
-        print("Calibration application failed.")
-        return False
+        result = self.send_command_and_wait(CORE_APPLY_CALIBRATION_CMD, CALIBRATION_APPLY_RSP, CALIBRATION_APPLY_NTF)
+        return bool(result)
     
     def configure_uwb(self, config_id, value):
         """Set a UWB configuration and ensure it applies correctly."""
         print(f"Setting config {config_id} to {value}...")
         command = CORE_SET_CONFIG_CMD + bytes([config_id, len(value)]) + value
-        self.uci.send_command(command)
-        response = self.wait_for_response(CONFIG_STATUS_RSP)
-        notification = self.wait_for_notification(CONFIG_STATUS_NTF)
-        return response is not None and notification is not None
+        result = self.send_command_and_wait(command, CONFIG_STATUS_RSP, CONFIG_STATUS_NTF)
+        return bool(result)
     
     def start_session(self, session_id):
         """Start a new UWB session and verify activation."""
         print(f"Starting UWB session {session_id}...")
         command = CORE_START_RANGING_CMD + session_id.to_bytes(4, 'little')
-        self.uci.send_command(command)
-        response = self.wait_for_response(SESSION_STATUS_RSP)
-        notification = self.wait_for_notification(SESSION_STATUS_NTF)
-        
-        if response and notification:
+        result = self.send_command_and_wait(command, SESSION_STATUS_RSP, SESSION_STATUS_NTF)
+        if result:
             self.uwbs_state = UWBS_STATE_ACTIVE
             return True
         return False
@@ -111,11 +97,8 @@ class UciManager:
         """Stop an active UWB session."""
         print(f"Stopping UWB session {session_id}...")
         command = CORE_STOP_RANGING_CMD + session_id.to_bytes(4, 'little')
-        self.uci.send_command(command)
-        response = self.wait_for_response(SESSION_STATUS_RSP)
-        notification = self.wait_for_notification(SESSION_STATUS_NTF)
-        
-        if response and notification:
+        result = self.send_command_and_wait(command, SESSION_STATUS_RSP, SESSION_STATUS_NTF)
+        if result:
             self.uwbs_state = UWBS_STATE_IDLE
             return True
         return False
@@ -135,15 +118,4 @@ class UciManager:
     def get_uwbs_state(self):
         """Retrieve the current UWB state."""
         return self.uwbs_state
-    
-if __name__ == "__main__":
-    manager = UciManager("firmware.bin")
-    manager.initialize_device()
-    manager.configure_uwb(0x01, b'\x01')
-    manager.start_session(0x12345678)
-    time.sleep(5)  # Simulate active session
-    print("Active Sessions:", manager.get_active_sessions())
-    manager.stop_session(0x12345678)
-    print("Max Sessions Supported:", manager.get_max_sessions())
-    print("Current UWBS State:", manager.get_uwbs_state())
 
