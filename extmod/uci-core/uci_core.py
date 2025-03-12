@@ -2,6 +2,7 @@ import machine
 import time
 import _thread
 import binascii
+import esp32
 
 class UciCoreDriverSPI:
     def __init__(self, firmware_path: str, spi_id=2, baudrate=1000000, sck=20, mosi=8, miso=19, cs=3, ce=18, irq=9):
@@ -11,8 +12,19 @@ class UciCoreDriverSPI:
         self.irq = machine.Pin(irq, machine.Pin.IN)
         self.irq.irq(trigger=machine.Pin.IRQ_FALLING, handler=self._irq_handler)
         
-        self.spi = machine.SPI(spi_id, baudrate=baudrate, sck=machine.Pin(sck),
-                               mosi=machine.Pin(mosi), miso=machine.Pin(miso))
+        # Explicitly configure GPIO before SPI initialization
+        sck_pin = machine.Pin(sck, machine.Pin.OUT, pull=machine.Pin.PULL_DOWN)
+        mosi_pin = machine.Pin(mosi, machine.Pin.OUT)
+        miso_pin = machine.Pin(miso, machine.Pin.IN, pull=machine.Pin.PULL_UP)  # Enable pull-up for MISO
+        
+        # Route GPIOs through GPIO Matrix
+        esp32.gpio_matrix_out(sck, esp32.SPICLK_OUT, False, False)
+        esp32.gpio_matrix_out(mosi, esp32.SPID_OUT, False, False)
+        esp32.gpio_matrix_in(miso, esp32.SPID_IN, False)
+        
+        # Configure SPI with manually initialized GPIO
+        self.spi = machine.SPI(spi_id, baudrate=baudrate, sck=sck_pin, mosi=mosi_pin, miso=miso_pin)
+        
         self.lock = _thread.allocate_lock()
         self.notification_semaphore = _thread.allocate_lock()
         self.notification_data = None
@@ -90,7 +102,12 @@ class UciCoreDriverSPI:
         
         while offset < total_size:
             chunk = firmware_data[offset:offset + chunk_size]
-            self.send_command(chunk)
+            
+            with self.lock:
+                self.cs.value(0)  # Select the UWB chip before writing
+                self.spi.write(chunk)  # Write chunk over SPI
+                self.cs.value(1)  # Deselect the chip after writing
+            
             offset += chunk_size
             print(f"Firmware write progress: {offset}/{total_size} bytes\r", end="")
         

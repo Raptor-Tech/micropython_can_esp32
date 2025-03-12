@@ -11,7 +11,7 @@ ifdef BOARD_DIR
 BOARD ?= $(notdir $(BOARD_DIR:/=))
 else
 # If not given on the command line, then default to ESP32_GENERIC.
-BOARD ?= ESP32_GENERIC
+BOARD ?= ESP32_GENERIC_S3
 BOARD_DIR ?= boards/$(BOARD)
 endif
 
@@ -29,7 +29,7 @@ BUILD ?= build-$(BOARD)-$(BOARD_VARIANT)
 else
 BUILD ?= build-$(BOARD)
 endif
-USER_C_MODULES = /home/jean_ferreira_raptortech_com_au/ulab/code/micropython.cmake
+USER_C_MODULES = `pwd`/../../../ulab/code/micropython.cmake
 # Device serial settings.
 ifneq ($(PORT),)
 PORT_ARG := -p $(PORT)
@@ -49,7 +49,7 @@ ifdef USER_C_MODULES
 	CMAKE_ARGS += -DUSER_C_MODULES=${USER_C_MODULES}
 endif
 
-IDFPY_FLAGS += -D MICROPY_BOARD=$(BOARD) -D MICROPY_BOARD_DIR="$(abspath $(BOARD_DIR))" $(CMAKE_ARGS)
+IDFPY_FLAGS += -D MICROPY_BOARD=$(BOARD) -D MICROPY_BOARD_DIR="$(abspath $(BOARD_DIR))" $(CMAKE_ARGS) -D MICROPY_FLOAT_IMPL=MICORPY_FLOAT_IMPL_DOUBLE
 
 ifdef FROZEN_MANIFEST
        IDFPY_FLAGS += -D MICROPY_FROZEN_MANIFEST=$(FROZEN_MANIFEST)
