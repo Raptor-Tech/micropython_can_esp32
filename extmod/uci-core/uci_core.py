@@ -56,32 +56,8 @@ class UciCoreDriverSPI:
             return self.notification_data
         return None
     
-    def send_command(self, command: bytes):
-        """Send a command to the UCI Core over SPI while capturing incoming data."""
-        with self.lock:
-            self.cs.value(0)  # Select the UWB chip
-            print(f"Sending SPI command: {binascii.hexlify(command).decode()}")
-            
-            response_buffer = bytearray(len(command))  # Buffer to capture incoming data
-            self.spi.write_readinto(command, response_buffer)  # Full-duplex transfer
-            
-            self.cs.value(1)  # Deselect the UWB chip
-        
-        print(f"Received SPI response during transmission: {binascii.hexlify(response_buffer).decode()}")
-        return response_buffer
-    
-    def read_response(self, length=10):
-        """Read response from UCI Core via SPI with diagnostic output."""
-        with self.lock:
-            self.cs.value(0)  # Select the UWB chip
-            response = bytearray(length)
-            self.spi.readinto(response)  # Read response bytes
-            self.cs.value(1)  # Deselect the UWB chip
-        print(f"Received SPI response: {binascii.hexlify(response).decode()}")
-        return response
-    
     def write_firmware_to_device(self, firmware_path: str):
-        """Write firmware from an external .bin file to the UWB chip over SPI."""
+        """Write firmware from an external .bin file to the UWB chip over SPI while capturing responses."""
         print(f"Loading firmware from {firmware_path}...")
         
         try:
@@ -98,14 +74,18 @@ class UciCoreDriverSPI:
         
         while offset < total_size:
             chunk = firmware_data[offset:offset + chunk_size]
+            response_buffer = bytearray(len(chunk))
             
             with self.lock:
                 self.cs.value(0)  # Select the UWB chip before writing
-                self.spi.write(chunk)  # Write chunk over SPI
+                time.sleep(0.001)  # Allow the slave to become ready before transmission
+                self.spi.write_readinto(chunk, response_buffer)  # Write and read at the same time
                 self.cs.value(1)  # Deselect the chip after writing
             
+            print(f"Firmware write progress: {offset + len(chunk)}/{total_size} bytes\r", end="")
+            print(f"Received SPI response during firmware write: {binascii.hexlify(response_buffer).decode()}")
             offset += chunk_size
-            print(f"Firmware write progress: {offset}/{total_size} bytes\r", end="")
+            time.sleep(0.01)  # Allow processing time
         
         print("Firmware write complete!")
         return True
