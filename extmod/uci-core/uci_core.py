@@ -57,19 +57,25 @@ class UciCoreDriverSPI:
         return None
     
     def send_command(self, command: bytes):
-        """Send a command to the UCI Core over SPI with diagnostic output."""
+        """Send a command to the UCI Core over SPI while capturing incoming data."""
         with self.lock:
             self.cs.value(0)  # Select the UWB chip
             print(f"Sending SPI command: {binascii.hexlify(command).decode()}")
-            self.spi.write(command)
-            time.sleep(0.01)  # Allow processing time
+            
+            response_buffer = bytearray(len(command))  # Buffer to capture incoming data
+            self.spi.write_readinto(command, response_buffer)  # Full-duplex transfer
+            
             self.cs.value(1)  # Deselect the UWB chip
+        
+        print(f"Received SPI response during transmission: {binascii.hexlify(response_buffer).decode()}")
+        return response_buffer
     
     def read_response(self, length=10):
         """Read response from UCI Core via SPI with diagnostic output."""
         with self.lock:
             self.cs.value(0)  # Select the UWB chip
-            response = self.spi.read(length)  # Read response bytes
+            response = bytearray(length)
+            self.spi.readinto(response)  # Read response bytes
             self.cs.value(1)  # Deselect the UWB chip
         print(f"Received SPI response: {binascii.hexlify(response).decode()}")
         return response
@@ -103,3 +109,4 @@ class UciCoreDriverSPI:
         
         print("Firmware write complete!")
         return True
+

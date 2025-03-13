@@ -37,9 +37,7 @@ class UciManager:
     
     def send_command_and_wait(self, command, expected_response_code, expected_notification_code=None, timeout=5):
         """Send a command, wait for a response, and optionally a notification."""
-        self.uci.send_command(command)
-        
-        response = self.uci.read_response()
+        response = self.uci.send_command(command)
         if not response or response[0] != expected_response_code:
             print(f"Unexpected or missing response. Expected: {expected_response_code}, Received: {response}")
             return None
