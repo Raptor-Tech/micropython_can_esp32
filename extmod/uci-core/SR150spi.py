@@ -48,7 +48,8 @@ class SR150:
         For simplicity, we assume the packet format is:
           [Header (4 bytes)] + [payload]
         """
-        header = bytearray([0x00, 0x00, 0x00, 0x00])  # Example header (replace with actual)
+        # Example header based on assumed command structure
+        header = bytearray([0x00, 0x00, 0x00, 0x00])  # Replace with actual header fields
         packet = header + payload
         self.cs.value(0)
         self.spi.write(packet)  # Send command to the device
@@ -143,7 +144,7 @@ class SR150:
 
                         # Compare sent and received data
                         if chunk != received_chunk:
-                            print("Error: Sent and received data do not match.")
+                            print("Error: Sent and received data do not match.\r", end="")
                             print(f"Sent: {chunk}")
                             print(f"Received: {received_chunk}")
                             # Reset the device and try again
@@ -170,11 +171,12 @@ class SR150:
         This will send a simple UCI command and check the response.
         """
         print("Checking device status...")
-        # Send a basic UCI command to query the device status, for example, DEVICE_STATUS_NTF.
-        self.send_command(0x01, b'\x00\x01')  # Example command (Replace with actual UCI command)
+        # Example UCI command for device status (replace with actual command)
+        device_status_payload = bytearray([0x01])  # Example payload, adjust as per UCI spec
+        self.send_command(0x01, device_status_payload)  # Sending device status command
 
         # Read the response while sending zeros to keep the interface active
-        response = self.read_response(256)  # You can adjust the length based on the expected response
+        response = self.read_response(256)  # Adjust the length based on the expected response
         print("Device response:", response)
 
         # Check if the response is non-empty
