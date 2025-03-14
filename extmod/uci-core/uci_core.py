@@ -12,8 +12,11 @@ class UciCoreDriverSPI:
         self.irq.irq(trigger=machine.Pin.IRQ_FALLING, handler=self._irq_handler)
         
         # Configure SPI
-        self.spi = machine.SPI(spi_id, baudrate=baudrate, sck=machine.Pin(sck),
-                               mosi=machine.Pin(mosi), miso=machine.Pin(miso))
+        self.spi = machine.SPI(spi_id, baudrate=baudrate,
+                sck=machine.Pin(sck),
+                mosi=machine.Pin(mosi), miso=machine.Pin(miso),
+                phase = 1
+        )
         
         self.lock = _thread.allocate_lock()
         self.notification_semaphore = _thread.allocate_lock()
