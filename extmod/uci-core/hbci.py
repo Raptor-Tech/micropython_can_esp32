@@ -2,35 +2,48 @@ from  machine import SPI, Pin
 import struct
 import time
 import _thread
-import threading
-from binascii import crc_hqx
 
-_buffsize = 4096
 
 
 class HBCIqueue(SPIqueue):
+
+  CHUNKSIZE = 240
+
   def __init__(self, spiQ: SPIqueue):
     super().__init__(spiQ.spi, spiQ.irqPin, spiQ.syncPin, spiQ.csPin, spiQ.cePin)
     self.cePin.value(0)
     time.sleep(10)
     self.cePin.value(1)
 
+@staticmethod
+  def crc_16(data: bytes, poly: int = 0x1021, init: int = 0xFFFF) -> int:
+    crc = init
+    for byte in data:
+      crc ^= byte << 8
+      for _ in range(8):
+        if crc & 0x8000:
+          crc = (crc << 1) ^ poly
+        else:
+          crc <<= 1
+        crc &= 0xFFFF
+    return crc
+
   def _firmware_upload(self):
     f = open(self.firmware, "rb")
-    while (chunk := f.read(CHUNKSIZE)):
+    while (clen:= len(chunk := f.read(CHUNKSIZE))):
       packet = HBCIfirmware(chunk)
       self.queue_packet(packet)
-      if CHUNKSIZE > len(chunk):
+      if CHUNKSIZE > clen:  # Last Chunk -- Already tested > 0 by while clause
         break
 
-  def rd_handshake():
+  def rd_handshake(self):
     while 1:
-      if self.intPin.value() == 0:
+      if self.irqPin.value() == 0:
         break
 
-  def wr_handshake():
+  def wr_handshake(self):
     while 1:
-      if self.irdPin.value() == 0:
+      if self.irqPin.value() == 0:
         break
 
   def irq_handler(self, pin):
@@ -39,69 +52,44 @@ class HBCIqueue(SPIqueue):
 
 
 class HBCIpacket(SPIpacket):
-  HEADER = 0xAA55
-  HEADER_FORMAT = '>HBB'
+  HEADER_SIZE = 5
+  PACKET_ID = 0xAA55
+  HEADER_FORMAT = '>HBBB'
   CHECKSUM_FORMAT = '>H'
 
   def __init__(self):
-    pass
+    super().__init__()
 
   def accept_response(self, header, consume):
     pass
 
-
 class HBCIcommand(HBCIpacket):
   def __init__(self, cla: int, ins: int, payload: bytes = b''):
-    self.cla = cla
-    self.ins = ins
+    super().__init__()
+#    self.cla = cla
+#    self.ins = ins
     self.payload = payload
     self.length = len(payload)
-    header = struct.pack(self.HEADER_FORMAT, self.HEADER, cla, ins)
     length_byte = bytes([len(self.payload)])
+    header = struct.pack(self.HEADER_FORMAT, self.PACKET_ID, cla, ins, len(payload))
     crc = struct.pack(self.CHECKSUM_FORMAT, self.compute_checksum(header + length_byte + payload))
     self._data = header + length_byte + payload + crc
 
-  def data(self) -> bytes:
-    return self._data
+  def cla(self):
+    return self.header[-3]
 
-  def response_bytes_required(self) -> int:
-    return len(self._data)
+  def ins(self):
+    return self.header[-2]
 
-
-class HBCIresponse(HBCIpacket):
-  def __init__(self, payload: bytes):
-    self.payload = payload
-    self.valid = False
-    if len(raw_data) >= 6:
-      header = raw_data[:2]
-      self.cla = raw_data[2]
-      self.ins = raw_data[3]
-      self.length = raw_data[4]
-      self.payload = raw_data[5:-2]
-      self.crc_received = struct.unpack(self.CHECKSUM_FORMAT, raw_data[-2:])[0]
-      calc_crc = self.compute_checksum(raw_data[:-2])
-      self.valid = self.crc_received == calc_crc
-
-
-class HBCIfirmware(HBCIpacket):
-  def __init__(self, chunk: bytes):
-    self.cla = 0x13
-    self.ins = 0x04
-    self.payload = chunk
-    self.length = len(self.payload)
-    header = struct.pack(self.HEADER_FORMAT, self.HEADER, self.cla, self.ins)
-    length_byte = bytes([self.length])
-    crc = struct.pack(self.CHECKSUM_FORMAT, self.compute_checksum(header + length_byte + self.payload))
-    self._data = header + length_byte + self.payload + crc
-    self.retry = 3
-    self._status = None
-    self._status_sema = threading.Semaphore(0)
+  def len(self):
+    return self.header[-1]
 
   def data(self) -> bytes:
     return self._data
 
-  def response_bytes_required(self) -> int:
-    return 8
+  def response_bytes_required(self):
+    return self.HEADER_SIZE
+
 
   def accept_response(self, header_chk, consume) -> bool:
     response = consume(8)
@@ -120,4 +108,82 @@ class HBCIfirmware(HBCIpacket):
       self.set_status("FAIL")
 
     return True
+
+
+class HBCIresponse(HBCIpacket):
+  def __init__(self, payload: bytes):
+    self.payload = payload
+    self.valid = False
+    if len(raw_data) >= 6:
+      header = raw_data[:2]
+      self.cla = raw_data[2]
+      self.ins = raw_data[3]
+      self.length = raw_data[4]
+      self.payload = payload
+      self.crc_received = struct.unpack(self.CHECKSUM_FORMAT, raw_data[-2:])[0]
+      calc_crc = self.compute_checksum(raw_data[:-2])
+      self.valid = self.crc_received == calc_crc
+
+
+
+
+class HBCIQueryChipID(HBCIcommand):
+  def __init__(self):
+    super().__init__(cla=0x00, ins=0x01)
+
+
+class HBCISetConfig(HBCIcommand):
+  def __init__(self, config_data):
+    super().__init__(cla=0x00, ins=0x02, payload=config_data)
+
+
+class HBCIResetDevice(HBCIcommand):
+  def __init__(self):
+    super().__init__(cla=0x00, ins=0x03)
+
+
+class HBCIFirmwareChunk(HBCIcommand):
+  def __init__(self, chunk):
+
+
+class HBCIFinalizeFirmware(HBCIcommand):
+  def __init__(self):
+    super().__init__(cla=0x13, ins=0x05)
+
+
+class HBCIGetStatus(HBCIcommand):
+  def __init__(self):
+    super().__init__(cla=0x00, ins=0x06)
+
+
+class HBCISelfTest(HBCIcommand):
+  def __init__(self):
+    super().__init__(cla=0x00, ins=0x07)
+
+
+class HBCIFetchLogs(HBCIcommand):
+  def __init__(self):
+    super().__init__(cla=0x00, ins=0x08)
+
+
+class HBCIfirmwareChunk(HBCIcommand):
+  def __init__(self, chunk: bytes):
+    super().__init__(cla=0x13, ins=0x04, payload=chunk)
+#    self.cla = 0x13
+#    self.ins = 0x04
+#    self.payload = chunk
+#    self.length = len(self.payload)
+    header = struct.pack(self.HEADER_FORMAT, self.HEADER, self.cla, self.ins)
+    length_byte = bytes([self.length])
+    crc = struct.pack(self.CHECKSUM_FORMAT, self.compute_checksum(header + length_byte + self.payload))
+    self._data = header + length_byte + self.payload + crc
+    self.retry = 3
+    self._status = None
+    self._status_sema = threading.Semaphore(0)
+
+  def data(self) -> bytes:
+    return self._data
+
+  def response_bytes_required(self) -> int:
+    return 8
 

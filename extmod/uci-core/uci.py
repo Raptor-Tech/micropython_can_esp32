@@ -1,40 +1,14 @@
-
+from spi import SPIqueue, SPIpacket
 import struct
-from binascii import crc_hqx
 
-class SPIpacket:
-  def __init__(self):
-    self._status = None
-    self._status_flag = False
-    self.retry = 3
-    self.response_timeout = 1.0
-    self.notify_timeout = 0.0
 
-  def set_status(self, value):
-    self._status = value
-    self._status_flag = True
+class UCIqueue(SPIqueue):
+  def __init__(self, firmware):
+    super().__init__()
+    HCBIqueue(, firmware=firmware)
 
-  def status(self, timeout=None):
-    return self._status
-
-  def data(self):
-    return self._data
-
-  def response_bytes_required(self):
-    return 0
-
-  def notify_bytes_required(self):
-    return 0
-
-  def accept_response(self, header, consume):
-    return False
-
-  def accept_notification(self, header, consume):
-    return False
-
-  @staticmethod
-  def compute_checksum(data):
-    return crc_hqx(data, 0xFFFF)
+  def irq_handler(self):
+    super().irq_handler()
 
 
 class UCIpacket(SPIpacket):
@@ -82,25 +56,6 @@ class UCIresponse(UCIpacket):
     self.header = struct.unpack('>HBB', self.raw[:4])
     self.payload = self.raw[4:-2]
 
-
-class SPIqueue:
-  def __init__(self):
-    self.sendq = []
-    self.respq = []
-
-  def queue_packet(self, packet):
-    self.sendq.append(packet)
-
-  def irq_handler(self):
-    pass  # Stub
-
-
-class UCIqueue(SPIqueue):
-  def __init__(self):
-    super().__init__()
-
-  def irq_handler(self):
-    super().irq_handler()
 
 
 class UCI:

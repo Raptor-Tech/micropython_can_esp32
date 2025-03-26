@@ -2,8 +2,6 @@ from  machine import SPI, Pin
 import struct
 import time
 import _thread
-import threading
-from binascii import crc_hqx
 
 _buffsize = 4096
 
@@ -28,10 +26,10 @@ class SPIqueue():
     threading.Thread(target=self._sendq_runner, daemon=True).start()
     threading.Thread(target=self._respq_runner, daemon=True).start()
 
-  def rd_sync():
+  def rd_sync(self):
     pass
 
-  def rd_handshake():
+  def rd_handshake(self):
     pass
 
   def read(self, length: int):
@@ -42,13 +40,13 @@ class SPIqueue():
     self.csPin.value(1)
     self.rd_clear()
 
-  def rd_clear():
+  def rd_clear(self):
     pass
 
-  def wr_sync():
+  def wr_sync(self):
     pass
 
-  def wr_handshake():
+  def wr_handshake(self):
     pass
 
   def write(self, data: bytes):
@@ -59,7 +57,7 @@ class SPIqueue():
     self.csPin.value(1)
     self.wr_clear()
 
-  def wr_clear():
+  def wr_clear(self):
     pass
 
   def irq_handler(self, pin):
@@ -67,56 +65,49 @@ class SPIqueue():
 
   def _sendq_runner(self):
     """Process packets from the send queue. Wait for ACK if response is expected."""
+    while True:
       self.tx_sema.acquire()
       if not self.sendq:
-        continue
+         continue
 
       packet = self.sendq[0]  # peek without removing
       data = packet.data()
       self.write(data)
 
       if packet.response_bytes_required() > 0:
-        self.respq.append(packet)
-
-      if packet.response_bytes_required() > 0:
         try:
           result = packet.status(timeout=1.0)
         except TimeoutError:
-          print("⏱️ Timeout waiting for response")
+          print("⏱️", end="")
           packet.retry -= 1
           if packet.retry > 0:
             packet._status = None
             self.tx_sema.release()
           else:
-            print("❌ Dropping after timeout retries.")
+            print("Dropping after timeout retries.")
             self.sendq.pop(0)
           continue
 
         if result == "ACK":
-          print("✅ ACK received")
+          print("✅", end="")
           self.sendq.pop(0)
         elif result == "RETRY":
-          print("🔁 Retrying")
+          print("🔁", end="")
           time.sleep(0.05)
           self.tx_sema.release()
         elif result == "FAIL":
-          print("❌ Failed, dropping packet")
+          print("❌")
           self.sendq.pop(0)
         continue
 
-      if result == "ACK":
-        print("✅ ACK received")
-        self.sendq.pop(0)
-      elif result == "RETRY":
-        print("🔁 Retrying")
-        time.sleep(0.05)
-        self.tx_sema.release()
-      elif result == "FAIL":
-        print("❌ Failed, dropping packet")
-        self.sendq.pop(0)
+      print("")
+
 
       if packet.notify_bytes_required() > 0:
         self.ntfyq.append(packet)
+
+      print("")
+      
 
   def _respq_runner(self):
     while True:
@@ -157,11 +148,11 @@ class SPIqueue():
 
 
 class SPIpacket(bytes):
-  self.hdr[HDRLEN] = 0
-  self.retry = 3
-  self.respLen = 0
-  self.ntfyLen = 0
-  self._data = Null
+  hdr = bytearray()
+  retry = 3
+  respLen = 0
+  ntfyLen = 0
+  _data = bytearray()
 
   def __init__(self, command_id: int, flags: int, payload: bytes = b''):
     self.command_id = command_id
@@ -183,10 +174,10 @@ class SPIpacket(bytes):
     self._status = value
     self._status_sema.release()
 
-  def hdr(self, data=Null):
-    pass
+  def hdr(self, data=None):
+    return None
 
-  def payload(self, data=Null):
+  def payload(self, data=None):
     _data[-len(data)-2] = data
     return self._data[:-2]
 
@@ -210,9 +201,20 @@ class SPIpacket(bytes):
 
   @staticmethod
   def compute_checksum(data: bytes) -> int:
-    return crc_hqx(data, 0xFFFF)
+    return crc_16(data)
 
   def __repr__(self):
     return f"HBCIPacket(command_id=0x{self.command_id:02X}, flags=0x{self.flags:02X}, payload={self.payload})"
 
-
+  @staticmethod
+  def crc_16(data: bytes, poly: int = 0x1021, init: int = 0xFFFF) -> int:
+    crc = init
+    for byte in data:
+      crc ^= byte << 8
+      for _ in range(8):
+        if crc & 0x8000:
+          crc = (crc << 1) ^ poly
+        else:
+          crc <<= 1
+        crc &= 0xFFFF
+    return crc
