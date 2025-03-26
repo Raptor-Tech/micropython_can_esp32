@@ -1,6 +1,7 @@
 from  machine import SPI, Pin
 import struct
 import time
+import _thread
 import threading
 from binascii import crc_hqx
 
@@ -65,25 +66,59 @@ class SPIqueue():
     pass
 
   def _sendq_runner(self):
-    """Continuously transmit packets from the send queue."""
-    while True:
+    """Process packets from the send queue. Wait for ACK if response is expected."""
       self.tx_sema.acquire()
       if not self.sendq:
         continue
 
-      packet = self.sendq.pop(0)
+      packet = self.sendq[0]  # peek without removing
       data = packet.data()
       self.write(data)
 
       if packet.response_bytes_required() > 0:
         self.respq.append(packet)
-      elif packet.notify_bytes_required() > 0:
+
+      if packet.response_bytes_required() > 0:
+        try:
+          result = packet.status(timeout=1.0)
+        except TimeoutError:
+          print("⏱️ Timeout waiting for response")
+          packet.retry -= 1
+          if packet.retry > 0:
+            packet._status = None
+            self.tx_sema.release()
+          else:
+            print("❌ Dropping after timeout retries.")
+            self.sendq.pop(0)
+          continue
+
+        if result == "ACK":
+          print("✅ ACK received")
+          self.sendq.pop(0)
+        elif result == "RETRY":
+          print("🔁 Retrying")
+          time.sleep(0.05)
+          self.tx_sema.release()
+        elif result == "FAIL":
+          print("❌ Failed, dropping packet")
+          self.sendq.pop(0)
+        continue
+
+      if result == "ACK":
+        print("✅ ACK received")
+        self.sendq.pop(0)
+      elif result == "RETRY":
+        print("🔁 Retrying")
+        time.sleep(0.05)
+        self.tx_sema.release()
+      elif result == "FAIL":
+        print("❌ Failed, dropping packet")
+        self.sendq.pop(0)
+
+      if packet.notify_bytes_required() > 0:
         self.ntfyq.append(packet)
 
-      print(f"Transmitted: {data.hex()}")
-
   def _respq_runner(self):
-    """Process incoming data in rxbuffer, using semaphore to block until enough data is available."""
     while True:
       self.rx_sema.acquire()
 
@@ -106,8 +141,8 @@ class SPIqueue():
                 return result
             time.sleep(0.001)
 
-        header = self.rxbuffer[:needed]
-        if packet.accept_response(header, consume):
+        header_chk = self.rxbuffer[:needed]
+        if packet.accept_response(header_chk, consume):
           self.respq.pop(0)
 
   def append_rx_data(self, data: bytes):
@@ -130,8 +165,7 @@ class HBCIqueue(SPIqueue):
   def _firmware_upload(self):
     f = open(self.firmware, "rb")
     while (chunk := f.read(CHUNKSIZE)):
-      packet = HBCIfirmware()
-      packet.payload(chunk)
+      packet = HBCIfirmware(chunk)
       self.queue_packet(packet)
       if CHUNKSIZE > len(chunk):
         break
@@ -161,6 +195,21 @@ class SPIpacket(bytes):
     self.command_id = command_id
     self.flags = flags
     self.payload = payload
+    self._status = None
+    self._status_sema = threading.Semaphore(0)
+
+  def status(self, timeout=1.0):
+    if self._status is not None:
+      return self._status
+    if timeout == 0:
+      return None
+    if not self._status_sema.acquire(timeout=timeout):
+      raise TimeoutError("Packet status wait timed out")
+    return self._status
+
+  def set_status(self, value):
+    self._status = value
+    self._status_sema.release()
 
   def hdr(self, data=Null):
     pass
@@ -213,16 +262,16 @@ class HBCIcommand(HBCIpacket):
     self.ins = ins
     self.payload = payload
     self.length = len(payload)
-    header = struct.pack(self.HEADER_FORMAT, self.HEADER, cla, ins, len(self.payload))
-
-    crc = struct.pack(self.CHECKSUM_FORMAT, self.compute_checksum(header + payload))
-    self._data = header + payload + crc
+    header = struct.pack(self.HEADER_FORMAT, self.HEADER, cla, ins)
+    length_byte = bytes([len(self.payload)])
+    crc = struct.pack(self.CHECKSUM_FORMAT, self.compute_checksum(header + length_byte + payload))
+    self._data = header + length_byte + payload + crc
 
   def data(self) -> bytes:
     return self._data
 
-  def minimum_resp_len(self) -> int:
-    return len(self.header)
+  def response_bytes_required(self) -> int:
+    return len(self._data)
 
 
 class HBCIresponse(HBCIpacket):
@@ -240,9 +289,43 @@ class HBCIresponse(HBCIpacket):
       self.valid = self.crc_received == calc_crc
 
 
-class HBCIfirmware(SPIpacket):
-  def __init__(self):
-    pass
+class HBCIfirmware(HBCIpacket):
+  def __init__(self, chunk: bytes):
+    self.cla = 0x13
+    self.ins = 0x04
+    self.payload = chunk
+    self.length = len(self.payload)
+    header = struct.pack(self.HEADER_FORMAT, self.HEADER, self.cla, self.ins)
+    length_byte = bytes([self.length])
+    crc = struct.pack(self.CHECKSUM_FORMAT, self.compute_checksum(header + length_byte + self.payload))
+    self._data = header + length_byte + self.payload + crc
+    self.retry = 3
+    self._status = None
+    self._status_sema = threading.Semaphore(0)
+
+  def data(self) -> bytes:
+    return self._data
+
+  def response_bytes_required(self) -> int:
+    return 8
+
+  def accept_response(self, header_chk, consume) -> bool:
+    response = consume(8)
+    if len(response) != 8:
+      self.set_status("FAIL")
+      return True
+
+    hdr, cla, ins, length = struct.unpack('>HBBB', response[:5])
+
+    if ins == 0x81:
+      self.set_status("ACK")
+    elif ins in (0x82, 0x83):
+      self.retry -= 1
+      self.set_status("RETRY" if self.retry > 0 else "FAIL")
+    else:
+      self.set_status("FAIL")
+
+    return True
 
 
 class UCI():
