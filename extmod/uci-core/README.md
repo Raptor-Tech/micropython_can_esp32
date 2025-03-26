@@ -28,7 +28,7 @@ class UCIqueue {
 }
 
 class SPIpacket {
-  +__init__(command_id, flags, payload, response_timeout, notify_timeout)
+  +__init__()
   +status(timeout)
   +set_status(value)
   +data()
@@ -69,9 +69,6 @@ class UCIpacket {
 
 class UCIcommand {
   +__init__(gid, oid, payload)
-  +data()
-  +accept_response(header, consume)
-  +response_bytes_required()
 }
 
 class UCIresponse {
@@ -82,7 +79,6 @@ class UCIresponse {
 class UCI {
   +__init__(spi, ce, cs, irq, sync, firmware)
   +send_command()
-  +enter_mode()
 }
 
 SPIqueue <|-- HBCIqueue
@@ -94,5 +90,6 @@ HBCIpacket <|-- HBCIresponse
 HBCIcommand <|-- HBCIfirmware
 UCIpacket <|-- UCIcommand
 UCIpacket <|-- UCIresponse
+
 ```
 
