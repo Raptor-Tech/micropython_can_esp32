@@ -91,7 +91,7 @@ SPIpacket <|-- HBCIpacket
 SPIpacket <|-- UCIpacket
 HBCIpacket <|-- HBCIcommand
 HBCIpacket <|-- HBCIresponse
-HBCIpacket <|-- HBCIfirmware
+HBCIcommand <|-- HBCIfirmware
 UCIpacket <|-- UCIcommand
 UCIpacket <|-- UCIresponse
 ```
