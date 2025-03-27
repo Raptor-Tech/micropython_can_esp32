@@ -1,11 +1,16 @@
+# UCI Protocol State Implementation
+# Used after firmware upload to communicate with the UWB stack in UCI mode.
+# May be initialized directly or transitioned to by HBCIqueue after upload.
+
 from spi import SPIqueue, SPIpacket
 import struct
 
 
 class UCIqueue(SPIqueue):
-  def __init__(self, firmware):
-    super().__init__()
-    HCBIqueue(, firmware=firmware)
+  def __init__(self, spiQ: SPIqueue):
+    self.__dict__ = spiQ.__dict__
+
+    return self
 
   def irq_handler(self):
     super().irq_handler()

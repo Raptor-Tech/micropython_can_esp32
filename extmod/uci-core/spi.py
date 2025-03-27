@@ -1,3 +1,8 @@
+# SPIqueue Base Layer
+# Provides transport abstraction and state context for HBCI and UCI layers.
+# Handles TX/RX queues, threading, semaphores, and ring buffering.
+# Protocol-specific behavior is implemented by subclasses.
+
 from  machine import SPI, Pin
 import struct
 import time
@@ -9,12 +14,14 @@ _buffsize = 4096
 class SPIqueue():
   """ ``Abstract'' base class for SPI IRQ-based communication """
 
-  def __init__(self, spi, irq, sync, cs, ce):
+  def __init__(self, spi, ce, cs, irq, sync, firmware=None):
     self.spi = spi
-    self.irqPin = irq
-    self.syncPin = sync
     self.csPin = cs
     self.cePin = ce
+    self.irqPin = irq
+    self.syncPin = sync
+    self.firmware = firmware
+
     self.sendq = []
     self.respq = []
     self.ntfyq = []
@@ -23,8 +30,10 @@ class SPIqueue():
     self.tx_sema = threading.Semaphore(0)
     self.buffer_lock = threading.Lock()
 
-    threading.Thread(target=self._sendq_runner, daemon=True).start()
-    threading.Thread(target=self._respq_runner, daemon=True).start()
+    _thread.start_new_thread(self._sendq_runner, ())
+    _thread.start_new_thread(self._respq_runner, ())
+    
+    return self
 
   def rd_sync(self):
     pass

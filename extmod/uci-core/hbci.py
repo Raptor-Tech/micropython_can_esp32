@@ -1,3 +1,8 @@
+# HBCI Protocol State Implementation
+# This module implements the HBCIqueue class for managing SR150 firmware upload.
+# It acts as a temporary protocol state until UCI mode is entered.
+# State transitions are managed within _firmware_upload().
+
 from  machine import SPI, Pin
 import struct
 import time
@@ -10,12 +15,11 @@ class HBCIqueue(SPIqueue):
   CHUNKSIZE = 240
 
   def __init__(self, spiQ: SPIqueue):
-    super().__init__(spiQ.spi, spiQ.irqPin, spiQ.syncPin, spiQ.csPin, spiQ.cePin)
-    self.cePin.value(0)
-    time.sleep(10)
-    self.cePin.value(1)
+    self.__dict__ = spiQ.__dict__
 
-@staticmethod
+    _firmware_upload(self.firmware())
+
+  @staticmethod
   def crc_16(data: bytes, poly: int = 0x1021, init: int = 0xFFFF) -> int:
     crc = init
     for byte in data:
@@ -29,12 +33,33 @@ class HBCIqueue(SPIqueue):
     return crc
 
   def _firmware_upload(self):
+    """Performs firmware upload using HBCI protocol.
+    Transitions to UCIqueue state on completion.
+    """
+    # --- Firmware upload sequence ---
+    
+    # Reset Chip
+    self.cePin.value(0)
+    time.sleep(0.010)
+    self.cePin.value(1)
+
+    
+    self.queue_packet(HBCIStartFirmwareTransfer())  # Start transfer (optional flags can be added)
+
     f = open(self.firmware, "rb")
     while (clen:= len(chunk := f.read(CHUNKSIZE))):
-      packet = HBCIfirmware(chunk)
+      packet = HBCIfirmwareChunk(chunk)
       self.queue_packet(packet)
       if CHUNKSIZE > clen:  # Last Chunk -- Already tested > 0 by while clause
         break
+    
+    self.queue_packet(HBCIFinalizeFirmware())  # Finalize and boot into UCI
+
+    # --- State transition logic (optional) ---
+    from uci import UCIqueue
+    new_state = UCIqueue(self.spi, self.ce, self.cs, self.irq, self.sync)
+    self.__class__ = new_state.__class__
+    self.__dict__ = new_state.__dict__
 
   def rd_handshake(self):
     while 1:
@@ -140,10 +165,6 @@ class HBCISetConfig(HBCIcommand):
 class HBCIResetDevice(HBCIcommand):
   def __init__(self):
     super().__init__(cla=0x00, ins=0x03)
-
-
-class HBCIFirmwareChunk(HBCIcommand):
-  def __init__(self, chunk):
 
 
 class HBCIFinalizeFirmware(HBCIcommand):
