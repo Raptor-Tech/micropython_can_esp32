@@ -200,7 +200,7 @@ class HBCIfirmwareChunk(HBCIcommand):
     self._data = header + length_byte + self.payload + crc
     self.retry = 3
     self._status = None
-    self._status_sema = # Unsupported in MicroPython - implement custom semaphore(0)
+    self._status_sema = from semaphore import CountingCountingSemaphore(0)
 
   def data(self) -> bytes:
     return self._data

@@ -26,8 +26,8 @@ class SPIqueue():
     self.respq = []
     self.ntfyq = []
     self.rxbuffer = bytearray()
-    self.rx_sema = # Unsupported in MicroPython - implement custom semaphore(0)
-    self.tx_sema = # Unsupported in MicroPython - implement custom semaphore(0)
+    self.rx_sema = from semaphore import CountingCountingSemaphore(0)
+    self.tx_sema = from semaphore import CountingCountingSemaphore(0)
     self.buffer_lock = _thread.allocate_lock()
 
     _thread.start_new_thread(self._sendq_runner, ())
@@ -168,7 +168,7 @@ class SPIpacket(bytes):
     self.flags = flags
     self.payload = payload
     self._status = None
-    self._status_sema = # Unsupported in MicroPython - implement custom semaphore(0)
+    self._status_sema = from semaphore import CountingCountingSemaphore(0)
 
   def status(self, timeout=1.0):
     if self._status is not None:
