@@ -11,7 +11,12 @@ from spi import SPIqueue, SPIpacket
 
 class UCIqueue(SPIqueue):
   def __init__(self, spiQ: SPIqueue):
-    self.__dict__ = spiQ.__dict__
+    self.spi = spiQ.spi
+    self.cs = spiQ.cs
+    self.ce = spiQ.ce
+    self.irq = spiQ.irq
+    self.sync = spiQ.sync
+    self.firmware = spiQ.firmware
 
     return self
 

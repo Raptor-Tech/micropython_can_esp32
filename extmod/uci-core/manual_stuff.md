@@ -1,24 +1,26 @@
 ## New testing stuff
 ```
+
 from machine import Pin, SPI
 from spi import SPIqueue
 from hbci import HBCIqueue
+
 ```
 
 ```
-spiQ = SPIqueue(
-  SPI(2, sck=Pin(20), mosi=Pin(8), miso=Pin(19)),
-  ce=Pin(10), cs=Pin(3),
-  irq=Pin(9), sync=Pin(18),
-  firmware='H1_IOT.SR150_FACTORY_PROD_FW_46.41.06_0052bbfed983a1f1.bin'
-)
 
-hbciQ = HBCIqueue(SPIqueue)
+spi = SPI(2, sck=Pin(20), mosi=Pin(8), miso=Pin(19))
+
+sQ = SPIqueue( spi=spi, ce=Pin(10), cs=Pin(3), irq=Pin(9), sync=Pin(18), firmware='H1_IOT.SR150_FACTORY_PROD_FW_46.41.06_0052bbfed983a1f1.bin')
+
+hQ = HBCIqueue(sQ)
+
 ```
 
 ```
 def status():
   print(f"ce:{ce.value()} cs:{cs.value()} sck:{sck.value()} sdo:{sdo.value()} irq:{irq.value()} sdi:{sdi.value()} sync:{sync.value()}")
+
 
 
 ce = Pin(18, Pin.OUT)
@@ -38,6 +40,7 @@ sleep(1)
 status()
 
 # Old Test Stuff
+
 ```
 
 sr150 = SR150(SPI(2, sck=Pin(20), mosi=Pin(8), miso=Pin(19)), cs=Pin(3), ce=Pin(10), irq=Pin(9))

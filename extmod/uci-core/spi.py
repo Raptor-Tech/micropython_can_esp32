@@ -15,7 +15,7 @@ _buffsize = 4096
 class SPIqueue():
   """ ``Abstract'' base class for SPI IRQ-based communication """
 
-  def __init__(self, spi, ce, cs, irq, sync, firmware=None):
+  def __init__(self, spi=None, ce=None, cs=None, irq=None, sync=None, firmware=None):
     self.spi = spi
     self.cs = cs
     self.ce = ce

@@ -16,7 +16,12 @@ class HBCIqueue(SPIqueue):
   CHUNKSIZE = 240
 
   def __init__(self, spiQ: SPIqueue):
-    self.__dict__ = spiQ.__dict__
+    self.spi = spiQ.spi
+    self.cs = spiQ.cs
+    self.ce = spiQ.ce
+    self.irq = spiQ.irq
+    self.sync = spiQ.sync
+    self.firmware = spiQ.firmware
 
     self._firmware_upload()
 
@@ -45,7 +50,7 @@ class HBCIqueue(SPIqueue):
     self.ce.value(1)
 
     
-    self.queue_packet(HBCIStartFirmwareTransfer())  # Start transfer (optional flags can be added)
+    self.queue_packet(HBCIInitializeFirmwareTransfer())  # Start transfer (optional flags can be added)
 
     f = open(self.firmware, "rb")
     while (clen:= len(chunk := f.read(CHUNKSIZE))):
@@ -54,7 +59,7 @@ class HBCIqueue(SPIqueue):
       if CHUNKSIZE > clen:  # Last Chunk -- Already tested > 0 by while clause
         break
     
-    self.queue_packet(HBCIFinalizeFirmware())  # Finalize and boot into UCI
+    self.queue_packet(HBCIFinalizeFirmwareTransfer())  # Finalize and boot into UCI
 
     # --- State transition logic (optional) ---
     from uci import UCIqueue
@@ -168,7 +173,11 @@ class HBCIResetDevice(HBCIcommand):
     super().__init__(cla=0x00, ins=0x03)
 
 
-class HBCIFinalizeFirmware(HBCIcommand):
+class HBCIInitializeFirmwareTransfer(HBCIcommand):
+  def __init__(self, payload=b""):
+    super().__init__(cla=0x13, ins=0x01, payload=payload)
+
+class HBCIFinalizeFirmwareTransfer(HBCIcommand):
   def __init__(self):
     super().__init__(cla=0x13, ins=0x05)
 
