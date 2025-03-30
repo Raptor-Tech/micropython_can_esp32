@@ -2,9 +2,12 @@
 # Used after firmware upload to communicate with the UWB stack in UCI mode.
 # May be initialized directly or transitioned to by HBCIqueue after upload.
 
-from spi import SPIqueue, SPIpacket
+from  machine import SPI, Pin
 import struct
-
+import time
+import _thread
+from semaphore import CountingSemaphore
+from spi import SPIqueue, SPIpacket
 
 class UCIqueue(SPIqueue):
   def __init__(self, spiQ: SPIqueue):

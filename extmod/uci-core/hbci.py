@@ -7,7 +7,8 @@ from  machine import SPI, Pin
 import struct
 import time
 import _thread
-
+from semaphore import CountingSemaphore
+from spi import SPIqueue, SPIpacket
 
 
 class HBCIqueue(SPIqueue):
@@ -17,7 +18,7 @@ class HBCIqueue(SPIqueue):
   def __init__(self, spiQ: SPIqueue):
     self.__dict__ = spiQ.__dict__
 
-    _firmware_upload(self.firmware())
+    self._firmware_upload()
 
   @staticmethod
   def crc_16(data: bytes, poly: int = 0x1021, init: int = 0xFFFF) -> int:
@@ -39,9 +40,9 @@ class HBCIqueue(SPIqueue):
     # --- Firmware upload sequence ---
     
     # Reset Chip
-    self.cePin.value(0)
+    self.ce.value(0)
     time.sleep(0.010)
-    self.cePin.value(1)
+    self.ce.value(1)
 
     
     self.queue_packet(HBCIStartFirmwareTransfer())  # Start transfer (optional flags can be added)
@@ -63,12 +64,12 @@ class HBCIqueue(SPIqueue):
 
   def rd_handshake(self):
     while 1:
-      if self.irqPin.value() == 0:
+      if self.irq.value() == 0:
         break
 
   def wr_handshake(self):
     while 1:
-      if self.irqPin.value() == 0:
+      if self.irq.value() == 0:
         break
 
   def irq_handler(self, pin):
@@ -200,7 +201,7 @@ class HBCIfirmwareChunk(HBCIcommand):
     self._data = header + length_byte + self.payload + crc
     self.retry = 3
     self._status = None
-    self._status_sema = from semaphore import CountingCountingSemaphore(0)
+    self._status_sema = CountingSemaphore(0)
 
   def data(self) -> bytes:
     return self._data

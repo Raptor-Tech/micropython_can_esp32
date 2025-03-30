@@ -7,6 +7,7 @@ from  machine import SPI, Pin
 import struct
 import time
 import _thread
+from semaphore import CountingSemaphore
 
 _buffsize = 4096
 
@@ -16,24 +17,23 @@ class SPIqueue():
 
   def __init__(self, spi, ce, cs, irq, sync, firmware=None):
     self.spi = spi
-    self.csPin = cs
-    self.cePin = ce
-    self.irqPin = irq
-    self.syncPin = sync
+    self.cs = cs
+    self.ce = ce
+    self.irq = irq
+    self.sync = sync
     self.firmware = firmware
 
     self.sendq = []
     self.respq = []
     self.ntfyq = []
     self.rxbuffer = bytearray()
-    self.rx_sema = from semaphore import CountingCountingSemaphore(0)
-    self.tx_sema = from semaphore import CountingCountingSemaphore(0)
+    self.rx_sema = CountingSemaphore(0)
+    self.tx_sema = CountingSemaphore(0)
     self.buffer_lock = _thread.allocate_lock()
 
     _thread.start_new_thread(self._sendq_runner, ())
     _thread.start_new_thread(self._respq_runner, ())
     
-    return self
 
   def rd_sync(self):
     pass
@@ -43,10 +43,10 @@ class SPIqueue():
 
   def read(self, length: int):
     self.rd_sync()
-    self.csPin.value(0)
+    self.cs.value(0)
     self.rd_handshake()
     self.spi.read(length)
-    self.csPin.value(1)
+    self.cs.value(1)
     self.rd_clear()
 
   def rd_clear(self):
@@ -60,10 +60,10 @@ class SPIqueue():
 
   def write(self, data: bytes):
     self.wr_sync()
-    self.csPin.value(0)
+    self.cs.value(0)
     self.wr_handshake()
     self.spi.write(data)
-    self.csPin.value(1)
+    self.cs.value(1)
     self.wr_clear()
 
   def wr_clear(self):
@@ -168,7 +168,7 @@ class SPIpacket(bytes):
     self.flags = flags
     self.payload = payload
     self._status = None
-    self._status_sema = from semaphore import CountingCountingSemaphore(0)
+    self._status_sema = CountingSemaphore(0)
 
   def status(self, timeout=1.0):
     if self._status is not None:
