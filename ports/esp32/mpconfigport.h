@@ -198,22 +198,33 @@
 #define MICROPY_PY_BLUETOOTH_RANDOM_ADDR    (0)
 
 //add SDMMC
-#define MICROPY_HW_SDMMC_SLOT_CONFIG() {\
-    .clk = GPIO_NUM_16, \
-    .cmd = GPIO_NUM_8, \
-    .d0 = GPIO_NUM_1, \
-    .d1 = GPIO_NUM_NC, \
-    .d2 = GPIO_NUM_NC, \
-    .d3 = GPIO_NUM_NC, \
-    .d4 = GPIO_NUM_NC, \
-    .d5 = GPIO_NUM_NC, \
-    .d6 = GPIO_NUM_NC, \
-    .d7 = GPIO_NUM_NC, \
-    .cd = GPIO_NUM_NC, \
-    .wp = GPIO_NUM_NC, \
-    .width   = 1, \
-    .flags = 0, \
-}
+#if CONFIG_IDF_TARGET_ESP32
+    #define MICROPY_HW_SDMMC_SLOT_CONFIG() \
+        (sdmmc_slot_config_t){             \
+            .width = 1,                    \
+            .cd    = GPIO_NUM_NC,          \
+            .wp    = GPIO_NUM_NC,          \
+            .flags = 0,                    \
+        }
+#else
+    #define MICROPY_HW_SDMMC_SLOT_CONFIG() \
+    (sdmmc_slot_config_t){             \
+	    .clk = GPIO_NUM_16, \
+	    .cmd = GPIO_NUM_8, \
+	    .d0 = GPIO_NUM_1, \
+	    .d1 = GPIO_NUM_NC, \
+	    .d2 = GPIO_NUM_NC, \
+	    .d3 = GPIO_NUM_NC, \
+	    .d4 = GPIO_NUM_NC, \
+	    .d5 = GPIO_NUM_NC, \
+	    .d6 = GPIO_NUM_NC, \
+	    .d7 = GPIO_NUM_NC, \
+	    .cd = GPIO_NUM_NC, \
+	    .wp = GPIO_NUM_NC, \
+	    .width   = 1, \
+	    .flags = 0, \
+	}
+#endif
 
 // fatfs configuration
 #define MICROPY_FATFS_ENABLE_LFN            (1)

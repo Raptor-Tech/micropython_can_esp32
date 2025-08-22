@@ -42,6 +42,26 @@
 #include "driver/twai.h"
 #include "esp_task.h"
 #include "machine_can.h"
+//#include "can_timing_compat.h"
+
+
+#ifndef TWAI_TX_GPIO
+#define TWAI_TX_GPIO   ((gpio_num_t)MICROPY_HW_TWAI_TX)
+#endif
+#ifndef TWAI_RX_GPIO
+#define TWAI_RX_GPIO   ((gpio_num_t)MICROPY_HW_TWAI_RX)
+#endif
+
+// ---- Pure-constant timing initializers (OK at file scope) ----
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5,1,0)
+#define TWAI_TIMING_25K_INIT  { .clk_src = TWAI_CLK_SRC_DEFAULT, .quanta_resolution_hz = 10000000, \
+                                 .brp = 128, .tseg_1 = 14, .tseg_2 = 5, .sjw = 3, .triple_sampling = false }
+#define TWAI_TIMING_250K_INIT { .clk_src = TWAI_CLK_SRC_DEFAULT, .quanta_resolution_hz = 10000000, \
+                                 .brp = 16,  .tseg_1 = 13, .tseg_2 = 2, .sjw = 1, .triple_sampling = false }
+#else
+#define TWAI_TIMING_25K_INIT  { .brp = 128, .tseg_1 = 14, .tseg_2 = 5, .sjw = 3, .triple_sampling = false }
+#define TWAI_TIMING_250K_INIT { .brp = 16,  .tseg_1 = 13, .tseg_2 = 2, .sjw = 1, .triple_sampling = false }
+#endif
 
 #if MICROPY_HW_ENABLE_CAN
 
@@ -77,12 +97,21 @@ void can_deinit(const esp32_can_obj_t *self) {
 static const twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
 
 // singleton CAN device object
+/*
 esp32_can_config_t can_config = {
     .general = TWAI_GENERAL_CONFIG_DEFAULT(GPIO_NUM_2, GPIO_NUM_4, TWAI_MODE_NORMAL),
     .filter = f_config,  // TWAI_FILTER_CONFIG_ACCEPT_ALL(),
     .timing = TWAI_TIMING_CONFIG_25KBITS(),
     .initialized = false
 };
+// */
+
+esp32_can_config_t can_config = {
+    .general = TWAI_GENERAL_CONFIG_DEFAULT(TWAI_TX_GPIO, TWAI_RX_GPIO, TWAI_MODE_NORMAL),
+    .timing  = (twai_timing_config_t)TWAI_TIMING_25K_INIT,   // <-- compile-time constant
+    .filter  = TWAI_FILTER_CONFIG_ACCEPT_ALL(),
+};
+
 
 static esp32_can_obj_t esp32_can_obj = {
     {&machine_can_type},
@@ -301,7 +330,8 @@ static mp_obj_t esp32_hw_can_init_helper(esp32_can_obj_t *self, size_t n_args, c
    //ESP_LOGI("CAN_INIT", "Initializing with baudrate: %u", args[ARG_baudrate].u_int);
 
 
-    timing = ((twai_timing_config_t)TWAI_TIMING_CONFIG_250KBITS());
+//    timing = ((twai_timing_config_t)TWAI_TIMING_CONFIG_250KBITS());
+    timing = (twai_timing_config_t)TWAI_TIMING_250K_INIT;
     self->config->baudrate = 250000;
     self->config->timing = timing;
     //twai_driver_install(&self->config->general, &self->config->timing, &self->config->filter);

@@ -11,7 +11,9 @@ ifdef BOARD_DIR
 BOARD ?= $(notdir $(BOARD_DIR:/=))
 else
 # If not given on the command line, then default to ESP32_GENERIC.
+#BOARD ?= ESP32_GENERIC_S3
 BOARD ?= ESP32_GENERIC
+#BOARD ?= LOLIN_S2_PICO
 BOARD_DIR ?= boards/$(BOARD)
 endif
 
@@ -29,7 +31,7 @@ BUILD ?= build-$(BOARD)-$(BOARD_VARIANT)
 else
 BUILD ?= build-$(BOARD)
 endif
-USER_C_MODULES = /home/jean_ferreira_raptortech_com_au/ulab/code/micropython.cmake
+USER_C_MODULES = /home/devos/esp-dev/ulab/code/micropython.cmake
 # Device serial settings.
 ifneq ($(PORT),)
 PORT_ARG := -p $(PORT)
