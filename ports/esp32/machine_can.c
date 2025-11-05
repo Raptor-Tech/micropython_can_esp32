@@ -54,13 +54,15 @@
 
 // ---- Pure-constant timing initializers (OK at file scope) ----
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5,1,0)
-#define TWAI_TIMING_25K_INIT  { .clk_src = TWAI_CLK_SRC_DEFAULT, .quanta_resolution_hz = 10000000, \
-                                 .brp = 128, .tseg_1 = 14, .tseg_2 = 5, .sjw = 3, .triple_sampling = false }
-#define TWAI_TIMING_250K_INIT { .clk_src = TWAI_CLK_SRC_DEFAULT, .quanta_resolution_hz = 10000000, \
-                                 .brp = 16,  .tseg_1 = 13, .tseg_2 = 2, .sjw = 1, .triple_sampling = false }
+#define TWAI_TIMING_250K_INIT { .clk_src = TWAI_CLK_SRC_DEFAULT, .quanta_resolution_hz = 0, \
+                                .brp = 16, .tseg_1 = 15, .tseg_2 = 4, .sjw = 1, .triple_sampling = false }
+// Set .quanta_resolution_hz to zero to configure timing using .brp (baudrate prescaler), otherwise it will override
+// CAN_bps = 1 / ( .brp / 80MHz * TQ_len)
+// Where TQ_len = .tseg_1 + .tseg_2 + .sjw
+// Set the sampling point to ~80%
+// Sampling point = (.tseg_1 + .sjw) / TQ_len
 #else
-#define TWAI_TIMING_25K_INIT  { .brp = 128, .tseg_1 = 14, .tseg_2 = 5, .sjw = 3, .triple_sampling = false }
-#define TWAI_TIMING_250K_INIT { .brp = 16,  .tseg_1 = 13, .tseg_2 = 2, .sjw = 1, .triple_sampling = false }
+#define TWAI_TIMING_250K_INIT { .brp = 16, .tseg_1 = 15, .tseg_2 = 4, .sjw = 1, .triple_sampling = false }
 #endif
 
 #if MICROPY_HW_ENABLE_CAN
@@ -108,7 +110,7 @@ esp32_can_config_t can_config = {
 
 esp32_can_config_t can_config = {
     .general = TWAI_GENERAL_CONFIG_DEFAULT(TWAI_TX_GPIO, TWAI_RX_GPIO, TWAI_MODE_NORMAL),
-    .timing  = (twai_timing_config_t)TWAI_TIMING_25K_INIT,   // <-- compile-time constant
+    .timing  = (twai_timing_config_t)TWAI_TIMING_250K_INIT,   // <-- compile-time constant
     .filter  = TWAI_FILTER_CONFIG_ACCEPT_ALL(),
 };
 
