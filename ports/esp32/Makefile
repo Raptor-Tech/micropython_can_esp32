@@ -31,7 +31,7 @@ BUILD ?= build-$(BOARD)-$(BOARD_VARIANT)
 else
 BUILD ?= build-$(BOARD)
 endif
-USER_C_MODULES = /home/devos/esp-dev/ulab/code/micropython.cmake
+USER_C_MODULES = ${HOME}/esp-dev/ulab/code/micropython.cmake
 # Device serial settings.
 ifneq ($(PORT),)
 PORT_ARG := -p $(PORT)
